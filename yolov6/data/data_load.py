@@ -30,8 +30,8 @@ def create_dataloader(
     task="Train",
     specific_shape=False,
     height=1088,
-    width=1920
-
+    width=1920,
+    strides=None,
 ):
     """Create general dataloader.
 
@@ -59,7 +59,8 @@ def create_dataloader(
             task=task,
             specific_shape = specific_shape,
             height=height,
-            width=width
+            width=width,
+            strides=strides,
         )
 
     batch_size = min(batch_size, len(dataset))

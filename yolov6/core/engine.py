@@ -88,7 +88,8 @@ class Trainer:
                 self.cfg.data_aug.mosaic = 0.0
                 self.cfg.data_aug.mixup = 0.0
 
-        self.train_loader, self.val_loader = self.get_data_loader(self.args, self.cfg, self.data_dict)
+
+        self.train_loader, self.val_loader = self.get_data_loader(self, self.args, self.cfg, self.data_dict)
 
         self.model = self.parallel_model(args, model, device)
         self.model.nc, self.model.names = self.data_dict['nc'], self.data_dict['names']
@@ -375,7 +376,7 @@ class Trainer:
             self.last_opt_step = curr_step
 
     @staticmethod
-    def get_data_loader(args, cfg, data_dict):
+    def get_data_loader(self, args, cfg, data_dict):
         train_path, val_path = data_dict['train'], data_dict['val']
         # check data
         nc = int(data_dict['nc'])
@@ -387,7 +388,7 @@ class Trainer:
                                          hyp=dict(cfg.data_aug), augment=True, rect=args.rect, rank=args.local_rank,
                                          workers=args.workers, shuffle=True, check_images=args.check_images,
                                          check_labels=args.check_labels, data_dict=data_dict, task='train',
-                                         specific_shape=args.specific_shape, height=args.height, width=args.width)[0]
+                                         specific_shape=args.specific_shape, height=args.height, width=args.width, strides=cfg.model.head.strides)[0]
         # create val dataloader
         val_loader = None
         if args.rank in [-1, 0]:
@@ -397,6 +398,10 @@ class Trainer:
                                            workers=args.workers, check_images=args.check_images,
                                            check_labels=args.check_labels, data_dict=data_dict, task='val',
                                            specific_shape=args.specific_shape, height=args.height, width=args.width)[0]
+
+        # print(self.cfg.model.head.anchors_init)
+        # self.cfg.model.head.anchors_init = train_loader_res[1].anchors_grid
+        # print(self.cfg.model.head.anchors_init)
 
         return train_loader, val_loader
 
@@ -420,7 +425,7 @@ class Trainer:
             LOGGER.info(f'Loading state_dict from {weights} for fine-tuning...')
             model = load_state_dict(weights, model, map_location=device)
 
-        LOGGER.info('Model: {}'.format(model))
+        # LOGGER.info('Model: {}'.format(model))
         return model
 
     def get_teacher_model(self, args, cfg, nc, device):

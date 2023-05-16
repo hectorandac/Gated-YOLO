@@ -22,6 +22,8 @@ import torch
 from torch.utils.data import Dataset
 import torch.distributed as dist
 
+from sklearn.cluster import KMeans
+
 from .data_augment import (
     augment_hsv,
     letterbox,
@@ -67,8 +69,8 @@ class TrainValDataset(Dataset):
         task="train",
         specific_shape = False,
         height=1088,
-        width=1920
-
+        width=1920,
+        strides=[8,16,32],
     ):
         assert task.lower() in ("train", "val", "test", "speed"), f"Not supported task: {task}"
         t1 = time.time()
@@ -81,6 +83,25 @@ class TrainValDataset(Dataset):
         self.specific_shape = specific_shape
         self.target_height = height
         self.target_width = width
+        
+        LOGGER.info("Retrieving K-Means Clusters.")
+        bbox_dims = [(bbox[3], bbox[4]) for arr in self.labels for bbox in arr]
+        kMeans = KMeans(n_clusters=9, random_state=0).fit(bbox_dims)
+        anchor_boxes = kMeans.cluster_centers_
+        sorted_clusters = sorted(anchor_boxes, key=lambda x: x[0] * x[1])
+
+        self.anchors_grid = []
+        for i in range(len(strides)):
+            anchors_scale = sorted_clusters[i*3:i*3+3]
+            anchors_scale = [[int(anchor[0]*self.img_size), int(anchor[1]*self.img_size)] for anchor in anchors_scale]
+            self.anchors_grid.append([item for sublist in anchors_scale for item in sublist])
+        
+        LOGGER.info("Computed_anchors")
+        for i, anchors_scale in enumerate(self.anchors_grid):
+            LOGGER.info(f"P{i+3}/{strides[i]}: {anchors_scale}")
+        
+        print(self.anchors_grid)
+
         if self.rect:
             shapes = [self.img_info[p]["shape"] for p in self.img_paths]
             self.shapes = np.array(shapes, dtype=np.float64)
