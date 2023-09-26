@@ -18,7 +18,10 @@ from yolov6.layers.common import DetectBackend
 from yolov6.data.data_augment import letterbox
 from yolov6.data.datasets import LoadData
 from yolov6.utils.nms import non_max_suppression
-from yolov6.utils.torch_utils import get_model_info
+
+from scipy.ndimage import label, binary_dilation, sum as ndi_sum
+from PIL import Image
+from collections import defaultdict
 
 class Inferer:
     def __init__(self, source, webcam, webcam_addr, weights, device, yaml, img_size, half):
@@ -46,9 +49,6 @@ class Inferer:
             self.model.model.float()
             self.half = False
 
-        if self.device.type != 'cpu':
-            self.model(torch.zeros(1, 3, *self.img_size).to(self.device).type_as(next(self.model.model.parameters())))  # warmup
-
         # Load data
         self.webcam = webcam
         self.webcam_addr = webcam_addr
@@ -67,8 +67,14 @@ class Inferer:
 
         LOGGER.info("Switch model to deploy modality.")
 
-    def infer(self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True):
+    def infer(self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True, analyze=False, inference_with_mask=False, masks=None):
         ''' Model Inference and results visualization '''
+        if inference_with_mask:
+            assert masks is not None
+            print("Processing with mask")
+            self.model.model.detect.inference_with_mask = True
+            self.model.model.detect.masks = torch.load(masks)
+
         vid_path, vid_writer, windows = None, None, []
         fps_calculator = CalcFPS()
         for img_src, img_path, vid_cap in tqdm(self.files):
@@ -101,18 +107,19 @@ class Inferer:
 
             if len(det):
                 det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
-                for *xyxy, conf, cls in reversed(det):
+                for *xyxy, conf, cls, head_index in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf)
+                        line = (cls, *xywh, conf, head_index)
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img:
                         class_num = int(cls)  # integer class
-                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
+                        head_index_num = int(head_index)
+                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
 
-                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(class_num, True))
+                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
 
                 img_src = np.asarray(img_ori)
 
@@ -158,6 +165,128 @@ class Inferer:
                         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer.write(img_src)
 
+        if analyze:
+            print("Analyzing detections")
+            self.files = LoadData(self.source, self.webcam, self.webcam_addr)
+            x_image = None
+            img_src, img_path, vid_cap = next(iter(self.files))
+            if self.files.type == 'video':
+                ret, frame = vid_cap.read()
+                if not ret:
+                    print(f"Can't read the frame from {img_path}")
+                else:
+                    x_image = frame
+            elif self.files.type == 'image':
+                x_image = img_src
+
+            annotations = self.parse_yolo_annotations(txt_path + '.txt')
+            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], 'heatmap.png', 10000)
+            
+            img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
+            img = img.to(self.device)
+            if len(img.shape) == 3:
+                img = img[None]
+            self.model.model.prune_regions(img, heat_maps)
+            np.save('kernel.npy', heat_maps)
+
+    def first_and_others(generator):
+        iterator = iter(generator)
+        first_item = next(iterator)
+        yield first_item
+        yield first_item
+        yield from iterator 
+
+    @staticmethod
+    def parse_yolo_annotations(annotation_file):
+        annotations = defaultdict(list)
+    
+        with open(annotation_file, 'r') as f:
+            lines = f.readlines()
+
+        for line in lines:
+            cls, x, y, w, h, confidence, layer = line.strip().split()
+            cls = int(cls)
+            x = float(x)
+            y = float(y)
+            w = float(w)
+            h = float(h)
+            layer = int(layer)
+            area = w * h
+            confidence = float(confidence)
+
+            annotations[cls].append((x, y, w, h, area, confidence, layer))
+        
+        return annotations
+
+
+    @staticmethod
+    def generate_heatmap(annotations, frame_width, frame_height, output_file, size_threshold=500):
+        # Initialize heatmaps to zeros
+        heatmap_small = np.zeros((frame_height, frame_width))
+        heatmap_medium = np.zeros((frame_height, frame_width))
+        heatmap_large = np.zeros((frame_height, frame_width))
+        heatmap_xlarge = np.zeros((frame_height, frame_width))
+
+        for frame, boxes in annotations.items():
+            for x, y, w, h, area, confidence, layer in boxes:
+                x = int(x * frame_width)  # Convert percentage to pixels
+                y = int(y * frame_height)  # Convert percentage to pixels
+                w = int(w * frame_width)  # Convert percentage to pixels
+                h = int(h * frame_height)  # Convert percentage to pixels
+                
+                area = area * confidence
+
+                if layer == 0:  # Small size
+                    heatmap_small[y:y+h, x:x+w] += area
+                elif layer == 1:  # Medium size
+                    heatmap_medium[y:y+h, x:x+w] += area
+                elif layer == 2:  # Large size
+                    heatmap_large[y:y+h, x:x+w] += area
+                else:  # Extra-large size
+                    heatmap_xlarge[y:y+h, x:x+w] += area
+
+        # Normalize each heatmap for display and convert to binary
+        heatmaps = [heatmap_small, heatmap_medium, heatmap_large, heatmap_xlarge]
+        for i in range(len(heatmaps)):
+            heatmaps[i] = np.log1p(heatmaps[i])  # Logarithmic transformation
+            heatmaps[i] = heatmaps[i] / np.max(heatmaps[i])  # Normalization
+            heatmaps[i] = (heatmaps[i] > 0).astype(int)  # Convert to binary
+
+        # Dilation, connected component analysis and size thresholding
+        for i in range(len(heatmaps)):
+            heatmaps[i] = binary_dilation(heatmaps[i], iterations=10)  # Dilation to connect nearby areas
+            labeled, num_labels = label(heatmaps[i])  # Connected component analysis to form blobs
+            sizes = ndi_sum(heatmaps[i], labeled, range(num_labels + 1))  # Compute blob sizes
+            mask_sizes = sizes > size_threshold  # Apply size threshold
+            mask_sizes[0] = 0  # Background size is set to 0
+            heatmaps[i] = mask_sizes[labeled]  # Apply the mask to original image
+
+        # Subtract larger categories from smaller ones to prevent overlaps
+        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[1]))
+        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[2]))
+        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[3]))
+
+        heatmaps[1] = np.logical_and(heatmaps[1], np.logical_not(heatmaps[2]))
+        heatmaps[1] = np.logical_and(heatmaps[1], np.logical_not(heatmaps[3]))
+
+        heatmaps[2] = np.logical_and(heatmaps[2], np.logical_not(heatmaps[3]))
+
+        for i in range(len(heatmaps)):
+            heatmaps[i] = binary_dilation(heatmaps[i], iterations=64)  # Dilation to connect nearby areas
+            labeled, num_labels = label(heatmaps[i])  # Connected component analysis to form blobs
+            sizes = ndi_sum(heatmaps[i], labeled, range(num_labels + 1))  # Compute blob sizes
+            mask_sizes = sizes > size_threshold  # Apply size threshold
+            mask_sizes[0] = 0  # Background size is set to 0
+            heatmaps[i] = mask_sizes[labeled]  # Apply the mask to original image
+
+        # Combine the heatmaps into a single image using different colors for each size category
+        combined_heatmap = np.stack([heatmaps[0], heatmaps[1], heatmaps[2]], axis=-1)
+
+        # Save the combined heatmap as an image file
+        im = Image.fromarray(np.uint8(combined_heatmap*255))
+        im.save(output_file)
+        return heatmaps[0], heatmaps[1], heatmaps[2], heatmaps[3]
+
     @staticmethod
     def process_image(img_src, img_size, stride, half):
         '''Process image before image inference.'''
@@ -169,6 +298,46 @@ class Inferer:
         image /= 255  # 0 - 255 to 0.0 - 1.0
 
         return image, img_src
+    
+    @staticmethod
+    def generate_head_specific_kernels(original_kernel, img_shape, cell_size, num_heads):
+        """
+        Generate a set of point-wise kernels based on an original kernel.
+
+        Parameters:
+            original_kernel (np.ndarray): The original kernel.
+            img_shape (tuple): Shape of the original image as (height, width).
+            cell_size (int): Size of each cell in the original kernel.
+            num_heads (int): Number of head layers.
+
+        Returns:
+            np.ndarray: An array of new kernels for each head, starting from index 1.
+        """
+
+        # Calculate the number of cells along width and height
+        num_cells_w = img_shape[1] // cell_size
+        num_cells_h = img_shape[0] // cell_size
+
+        # Initialize an array of kernels, one for each head
+        new_kernels = np.zeros((num_heads-1, img_shape[0], img_shape[1]))
+
+        # Populate the new kernels
+        for h in range(1, num_heads):
+            for y in range(num_cells_h):
+                for x in range(num_cells_w):
+                    # Find the head with the maximum detection in this cell
+                    max_head = np.argmax(original_kernel[y, x])
+
+                    # Fill the corresponding area in the new kernel
+                    start_y = y * cell_size
+                    end_y = start_y + cell_size
+                    start_x = x * cell_size
+                    end_x = start_x + cell_size
+
+                    # If this cell's max head is 'h', set this region to 1 in new_kernels[h]
+                    new_kernels[h-1, start_y:end_y, start_x:end_x] = int(max_head == h)
+
+        return new_kernels
 
     @staticmethod
     def rescale(ori_shape, boxes, target_shape):

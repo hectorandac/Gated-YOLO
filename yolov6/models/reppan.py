@@ -1082,6 +1082,20 @@ class CSPRepBiFPANNeck_P6(nn.Module):
             block=block
         )
 
+        self.downsample_new = ConvBNReLU(
+            in_channels=channels_list[11],
+            out_channels=channels_list[11],
+            kernel_size=1,
+            stride=1
+        )
+
+        self.Rep_n7 = stage_block(
+            in_channels=channels_list[6] + channels_list[11],
+            out_channels=channels_list[12],
+            n=num_repeats[12],
+            e=csp_e,
+            block=block
+        )
 
     def forward(self, input):
 
@@ -1111,7 +1125,13 @@ class CSPRepBiFPANNeck_P6(nn.Module):
         p_concat_layer0 = torch.cat([down_feat0, fpn_out0], 1)
         pan_out0 = self.Rep_n6(p_concat_layer0) # P6
 
-        outputs = [pan_out3, pan_out2, pan_out1, pan_out0]
+        # New layer for P7
+        down_feat_new = self.downsample_new(pan_out0)
+
+        p_concat_layer_new = torch.cat([down_feat_new, fpn_out0], 1)
+        pan_out_new = self.Rep_n7(p_concat_layer_new) # P7
+
+        outputs = [pan_out3, pan_out2, pan_out1, pan_out0, pan_out_new]
 
         return outputs
 

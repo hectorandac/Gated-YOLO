@@ -38,6 +38,10 @@ def get_args_parser(add_help=True):
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels.')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences.')
     parser.add_argument('--half', action='store_true', help='whether to use FP16 half-precision inference.')
+    parser.add_argument('--analyze', action='store_true', help='Extract the region importance based on the detections made on a sample of the scene')
+    parser.add_argument('--masks', type=str, help='Path to the masks.pt file. The masks are used to enhance inference performance by selectively ignoring sections of the image per detection head, based on the provided mask regions, allowing the model to focus only on areas of interest.')
+    parser.add_argument('--inference_with_mask', action='store_true', help='Flag to determine whether to perform inference with the provided masks, allowing the model to focus only on the areas of interest and potentially enhancing performance.')
+
 
     args = parser.parse_args()
     LOGGER.info(args)
@@ -66,6 +70,9 @@ def run(weights=osp.join(ROOT, 'yolov6s.pt'),
         hide_labels=False,
         hide_conf=False,
         half=False,
+        analyze=False,
+        inference_with_mask=False,
+        masks=None
         ):
     """ Inference process, supporting inference on one image file or directory which containing images.
     Args:
@@ -105,7 +112,7 @@ def run(weights=osp.join(ROOT, 'yolov6s.pt'),
 
     # Inference
     inferer = Inferer(source, webcam, webcam_addr, weights, device, yaml, img_size, half)
-    inferer.infer(conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, not not_save_img, hide_labels, hide_conf, view_img)
+    inferer.infer(conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, not not_save_img, hide_labels, hide_conf, view_img, analyze, inference_with_mask, masks)
 
     if save_txt or not not_save_img:
         LOGGER.info(f"Results saved to {save_dir}")

@@ -39,6 +39,22 @@ class Model(nn.Module):
             featmaps.extend(x)
         x = self.detect(x)
         return x if export_mode is True else [x, featmaps]
+    
+    def prune_regions(self, x, source_mask):
+        x = self.backbone(x)
+        x = self.neck(x)
+
+        mask = [None for _ in range(len(x))]
+        n_type = x[0].dtype
+        n_device = x[0].device
+        
+        for i in range(len(source_mask)):
+            b, g, h, w = x[i].shape
+            original_mask_tensor = torch.tensor(source_mask[i], dtype=n_type, device=n_device)
+            mask[i] = F.interpolate(original_mask_tensor.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest')
+            mask[i] = mask[i].expand(b, g, -1, -1)
+        torch.save(mask, "masks.pt")
+
 
     def _apply(self, fn):
         self = super()._apply(fn)

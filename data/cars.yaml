@@ -1,0 +1,12 @@
+# COCO 2017 dataset http://cocodataset.org
+train: dataset/images/train
+val: dataset/images/val
+test: dataset/images/test
+
+# number of classes
+nc: 1
+# whether it is coco dataset, only coco dataset should be set to True.
+is_coco: False
+
+# class names
+names: [ 'vehicle' ]
