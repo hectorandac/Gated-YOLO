@@ -1,0 +1,14 @@
+.github
+.vscode
+assets
+dataset
+deploy
+dev_tools
+docs
+env
+outputmask
+runs
+.gitignore
+.pre-commit-config.yaml
+.python-version
+LICENSE
