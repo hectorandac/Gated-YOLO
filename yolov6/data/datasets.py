@@ -22,8 +22,6 @@ import torch
 from torch.utils.data import Dataset
 import torch.distributed as dist
 
-from sklearn.cluster import KMeans
-
 from .data_augment import (
     augment_hsv,
     letterbox,
