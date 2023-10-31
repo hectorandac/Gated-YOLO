@@ -119,3 +119,5 @@ venv.bak/
 *.engine
 
 dev_tools/
+
+*.whl
