@@ -49,6 +49,9 @@ class Inferer:
             self.model.model.float()
             self.half = False
 
+        #if self.device.type != 'cpu':
+        #    self.model(torch.zeros(1, 3, *self.img_size).to(self.device).type_as(next(self.model.model.parameters())))  # warmup
+
         # Load data
         self.webcam = webcam
         self.webcam_addr = webcam_addr
@@ -67,103 +70,118 @@ class Inferer:
 
         LOGGER.info("Switch model to deploy modality.")
 
-    def infer(self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True, analyze=False, inference_with_mask=False, masks=None):
-        ''' Model Inference and results visualization '''
-        if inference_with_mask:
-            assert masks is not None
-            print("Processing with mask")
-            self.model.model.detect.inference_with_mask = True
-            self.model.model.detect.masks = torch.load(masks)
+    def infer(self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True, analyze=False, inference_with_mask=False, masks=None, only_analyze = False, annotations_path = 'runs/inference/exp/labels/video1.txt'):
+        if not only_analyze:
+            ''' Model Inference and results visualization '''
+            if inference_with_mask:
+                assert masks is not None
+                print("Processing with mask")
+                self.model.model.detect.inference_with_mask = True
+                self.model.model.detect.masks = torch.load(masks)
+                
+                self.model.model.neck.inference_with_mask = True
+                self.model.model.neck.masks = torch.load(masks)
 
-        vid_path, vid_writer, windows = None, None, []
-        fps_calculator = CalcFPS()
-        for img_src, img_path, vid_cap in tqdm(self.files):
-            img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
-            img = img.to(self.device)
-            if len(img.shape) == 3:
-                img = img[None]
-                # expand for batch dim
-            t1 = time.time()
-            pred_results = self.model(img)
-            det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
-            t2 = time.time()
+            vid_path, vid_writer, windows = None, None, []
+            fps_calculator = CalcFPS()
+            min_fps = float('inf')
+            max_fps = 0
 
-            if self.webcam:
-                save_path = osp.join(save_dir, self.webcam_addr)
-                txt_path = osp.join(save_dir, self.webcam_addr)
-            else:
-                # Create output files in nested dirs that mirrors the structure of the images' dirs
-                rel_path = osp.relpath(osp.dirname(img_path), osp.dirname(self.source))
-                save_path = osp.join(save_dir, rel_path, osp.basename(img_path))  # im.jpg
-                txt_path = osp.join(save_dir, rel_path, 'labels', osp.splitext(osp.basename(img_path))[0])
-                os.makedirs(osp.join(save_dir, rel_path), exist_ok=True)
+            for img_src, img_path, vid_cap in tqdm(self.files):
+                img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
+                img = img.to(self.device)
+                if len(img.shape) == 3:
+                    img = img[None]
+                    # expand for batch dim
+                t1 = time.time()
+                pred_results = self.model(img)
+                det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
+                t2 = time.time()
 
-            gn = torch.tensor(img_src.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            img_ori = img_src.copy()
+                if self.webcam:
+                    save_path = osp.join(save_dir, self.webcam_addr)
+                    txt_path = osp.join(save_dir, self.webcam_addr)
+                else:
+                    # Create output files in nested dirs that mirrors the structure of the images' dirs
+                    rel_path = osp.relpath(osp.dirname(img_path), osp.dirname(self.source))
+                    save_path = osp.join(save_dir, rel_path, osp.basename(img_path))  # im.jpg
+                    txt_path = osp.join(save_dir, rel_path, 'labels', osp.splitext(osp.basename(img_path))[0])
+                    os.makedirs(osp.join(save_dir, rel_path), exist_ok=True)
 
-            # check image and font
-            assert img_ori.data.contiguous, 'Image needs to be contiguous. Please apply to input images with np.ascontiguousarray(im).'
-            self.font_check()
+                gn = torch.tensor(img_src.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+                img_ori = img_src.copy()
 
-            if len(det):
-                det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
-                for *xyxy, conf, cls, head_index in reversed(det):
-                    if save_txt:  # Write to file
-                        xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf, head_index)
-                        with open(txt_path + '.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                # check image and font
+                assert img_ori.data.contiguous, 'Image needs to be contiguous. Please apply to input images with np.ascontiguousarray(im).'
+                self.font_check()
 
-                    if save_img:
-                        class_num = int(cls)  # integer class
-                        head_index_num = int(head_index)
-                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
+                if len(det):
+                    det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
+                    for *xyxy, conf, cls, head_index in reversed(det):
+                        if save_txt:  # Write to file
+                            xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                            line = (cls, *xywh, conf, head_index)
+                            with open(txt_path + '.txt', 'a') as f:
+                                f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
+                        if save_img:
+                            class_num = int(cls)  # integer class
+                            head_index_num = int(head_index)
+                            label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
 
-                img_src = np.asarray(img_ori)
+                            self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
 
-            # FPS counter
-            fps_calculator.update(1.0 / (t2 - t1))
-            avg_fps = fps_calculator.accumulate()
+                    img_src = np.asarray(img_ori)
 
-            if self.files.type == 'video':
-                self.draw_text(
-                    img_src,
-                    f"FPS: {avg_fps:0.1f}",
-                    pos=(20, 20),
-                    font_scale=1.0,
-                    text_color=(204, 85, 17),
-                    text_color_bg=(255, 255, 255),
-                    font_thickness=2,
-                )
+                # FPS counter
+                fps_calculator.update(1.0 / (t2 - t1))
+                avg_fps = fps_calculator.accumulate()
 
-            if view_img:
-                if img_path not in windows:
-                    windows.append(img_path)
-                    cv2.namedWindow(str(img_path), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(img_path), img_src.shape[1], img_src.shape[0])
-                cv2.imshow(str(img_path), img_src)
-                cv2.waitKey(1)  # 1 millisecond
+                current_fps = 1.0 / (t2 - t1)
+                min_fps = min(min_fps, current_fps)
+                max_fps = max(max_fps, current_fps)
 
-            # Save results (image with detections)
-            if save_img:
-                if self.files.type == 'image':
-                    cv2.imwrite(save_path, img_src)
-                else:  # 'video' or 'stream'
-                    if vid_path != save_path:  # new video
-                        vid_path = save_path
-                        if isinstance(vid_writer, cv2.VideoWriter):
-                            vid_writer.release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, img_ori.shape[1], img_ori.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer.write(img_src)
+                if self.files.type == 'video':
+                    self.draw_text(
+                        img_src,
+                        f"FPS: {avg_fps:0.1f}",
+                        pos=(20, 20),
+                        font_scale=1.0,
+                        text_color=(204, 85, 17),
+                        text_color_bg=(255, 255, 255),
+                        font_thickness=2,
+                    )
+
+                if view_img:
+                    if img_path not in windows:
+                        windows.append(img_path)
+                        cv2.namedWindow(str(img_path), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+                        cv2.resizeWindow(str(img_path), img_src.shape[1], img_src.shape[0])
+                    cv2.imshow(str(img_path), img_src)
+                    cv2.waitKey(1)  # 1 millisecond
+
+                # Save results (image with detections)
+                if save_img:
+                    if self.files.type == 'image':
+                        cv2.imwrite(save_path, img_src)
+                    else:  # 'video' or 'stream'
+                        if vid_path != save_path:  # new video
+                            vid_path = save_path
+                            if isinstance(vid_writer, cv2.VideoWriter):
+                                vid_writer.release()  # release previous video writer
+                            if vid_cap:  # video
+                                fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                                w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                                h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            else:  # stream
+                                fps, w, h = 30, img_ori.shape[1], img_ori.shape[0]
+                            save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                            vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                        vid_writer.write(img_src)
+            
+            print(f"Average FPS: {avg_fps}")
+            print(f"Minimum FPS: {min_fps}")
+            print(f"Maximum FPS: {max_fps}")
 
         if analyze:
             print("Analyzing detections")
@@ -180,7 +198,7 @@ class Inferer:
                 x_image = img_src
 
             annotations = self.parse_yolo_annotations(txt_path + '.txt')
-            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], 'heatmap.png', 10000)
+            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], 'heatmap.png', 64000)
             
             img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
             img = img.to(self.device)
@@ -211,10 +229,9 @@ class Inferer:
             w = float(w)
             h = float(h)
             layer = int(layer)
-            area = w * h
             confidence = float(confidence)
 
-            annotations[cls].append((x, y, w, h, area, confidence, layer))
+            annotations[cls].append((x, y, w, h, confidence, layer))
         
         return annotations
 
@@ -226,15 +243,17 @@ class Inferer:
         heatmap_medium = np.zeros((frame_height, frame_width))
         heatmap_large = np.zeros((frame_height, frame_width))
         heatmap_xlarge = np.zeros((frame_height, frame_width))
+        
+        overlap_count = np.zeros((frame_height, frame_width, 4), dtype=int)
 
-        for frame, boxes in annotations.items():
-            for x, y, w, h, area, confidence, layer in boxes:
+        for i in range(len(annotations)):
+            for x, y, w, h, confidence, layer in tqdm(annotations[i], desc="Detections"):
                 x = int(x * frame_width)  # Convert percentage to pixels
                 y = int(y * frame_height)  # Convert percentage to pixels
                 w = int(w * frame_width)  # Convert percentage to pixels
                 h = int(h * frame_height)  # Convert percentage to pixels
-                
-                area = area * confidence
+
+                area = w * h * confidence
 
                 if layer == 0:  # Small size
                     heatmap_small[y:y+h, x:x+w] += area
@@ -245,31 +264,17 @@ class Inferer:
                 else:  # Extra-large size
                     heatmap_xlarge[y:y+h, x:x+w] += area
 
-        # Normalize each heatmap for display and convert to binary
+                # Increase count in overlap_count
+                overlap_count[y:y+h, x:x+w, layer] += 1
+
+        # Decide precedence and Create Binary Maps
+        chosen_layer = np.argmax(overlap_count * np.array([4,3,2,1]), axis=-1)
+        no_detection_mask = np.all(overlap_count == 0, axis=-1)
+        chosen_layer[no_detection_mask] = -1
+
         heatmaps = [heatmap_small, heatmap_medium, heatmap_large, heatmap_xlarge]
-        for i in range(len(heatmaps)):
-            heatmaps[i] = np.log1p(heatmaps[i])  # Logarithmic transformation
-            heatmaps[i] = heatmaps[i] / np.max(heatmaps[i])  # Normalization
-            heatmaps[i] = (heatmaps[i] > 0).astype(int)  # Convert to binary
-
-        # Dilation, connected component analysis and size thresholding
-        for i in range(len(heatmaps)):
-            heatmaps[i] = binary_dilation(heatmaps[i], iterations=10)  # Dilation to connect nearby areas
-            labeled, num_labels = label(heatmaps[i])  # Connected component analysis to form blobs
-            sizes = ndi_sum(heatmaps[i], labeled, range(num_labels + 1))  # Compute blob sizes
-            mask_sizes = sizes > size_threshold  # Apply size threshold
-            mask_sizes[0] = 0  # Background size is set to 0
-            heatmaps[i] = mask_sizes[labeled]  # Apply the mask to original image
-
-        # Subtract larger categories from smaller ones to prevent overlaps
-        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[1]))
-        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[2]))
-        heatmaps[0] = np.logical_and(heatmaps[0], np.logical_not(heatmaps[3]))
-
-        heatmaps[1] = np.logical_and(heatmaps[1], np.logical_not(heatmaps[2]))
-        heatmaps[1] = np.logical_and(heatmaps[1], np.logical_not(heatmaps[3]))
-
-        heatmaps[2] = np.logical_and(heatmaps[2], np.logical_not(heatmaps[3]))
+        for i in range(4):
+            heatmaps[i] = (chosen_layer == i).astype(int)
 
         for i in range(len(heatmaps)):
             heatmaps[i] = binary_dilation(heatmaps[i], iterations=64)  # Dilation to connect nearby areas
