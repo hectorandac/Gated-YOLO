@@ -22,7 +22,14 @@ class Detect(nn.Module):
         self.grid = [torch.zeros(1)] * num_layers
         self.prior_prob = 1e-2
         self.inplace = inplace
-        stride = [8, 16, 32] if num_layers == 3 else [8, 16, 32, 64, 128] # strides computed during build
+        
+        if num_layers == 3:
+            stride = [8, 16, 32]
+        elif num_layers == 4:
+            stride = [8, 16, 32, 64]
+        else:
+            stride = [8, 16, 32, 64, 128]
+
         self.stride = torch.tensor(stride)
         self.use_dfl = use_dfl
         self.reg_max = reg_max
@@ -99,6 +106,7 @@ class Detect(nn.Module):
             for i in range(self.nl):
                 b, _, h, w = x[i].shape
                 l = h * w
+
 
                 if self.inference_with_mask and self.masks[i] is None:
                     head_index_list.append(torch.full((b, self.nc, l), i, device=device))
@@ -258,50 +266,51 @@ def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16, 
             kernel_size=1
         )
     )
-
-    head_layers.add_module('stem3',
-        # stem3
-        ConvBNSiLU(
-            in_channels=channels_list[chx[3]],
-            out_channels=channels_list[chx[3]],
-            kernel_size=1,
-            stride=1
+    
+    if num_layers == 4:
+        head_layers.add_module('stem3',
+            # stem3
+            ConvBNSiLU(
+                in_channels=channels_list[chx[3]],
+                out_channels=channels_list[chx[3]],
+                kernel_size=1,
+                stride=1
+            )
         )
-    )
-    head_layers.add_module('cls_conv3',
-        # cls_conv3
-        ConvBNSiLU(
-            in_channels=channels_list[chx[3]],
-            out_channels=channels_list[chx[3]],
-            kernel_size=3,
-            stride=1
+        head_layers.add_module('cls_conv3',
+            # cls_conv3
+            ConvBNSiLU(
+                in_channels=channels_list[chx[3]],
+                out_channels=channels_list[chx[3]],
+                kernel_size=3,
+                stride=1
+            )
         )
-    )
-    head_layers.add_module('reg_conv3',
-        # reg_conv3
-        ConvBNSiLU(
-            in_channels=channels_list[chx[3]],
-            out_channels=channels_list[chx[3]],
-            kernel_size=3,
-            stride=1
+        head_layers.add_module('reg_conv3',
+            # reg_conv3
+            ConvBNSiLU(
+                in_channels=channels_list[chx[3]],
+                out_channels=channels_list[chx[3]],
+                kernel_size=3,
+                stride=1
+            )
         )
-    )
-    head_layers.add_module('cls_pred3',
-        # cls_pred3
-        nn.Conv2d(
-            in_channels=channels_list[chx[3]],
-            out_channels=num_classes * num_anchors,
-            kernel_size=1
+        head_layers.add_module('cls_pred3',
+            # cls_pred3
+            nn.Conv2d(
+                in_channels=channels_list[chx[3]],
+                out_channels=num_classes * num_anchors,
+                kernel_size=1
+            )
+            )
+        head_layers.add_module('reg_pred3',
+            # reg_pred3
+            nn.Conv2d(
+                in_channels=channels_list[chx[3]],
+                out_channels=4 * (reg_max + num_anchors),
+                kernel_size=1
+            )
         )
-        )
-    head_layers.add_module('reg_pred3',
-        # reg_pred3
-        nn.Conv2d(
-            in_channels=channels_list[chx[3]],
-            out_channels=4 * (reg_max + num_anchors),
-            kernel_size=1
-        )
-    )
 
     if num_layers == 5:
         head_layers.add_module('stem4',
