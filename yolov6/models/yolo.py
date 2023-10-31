@@ -22,6 +22,8 @@ class Model(nn.Module):
         # Build network
         num_layers = config.model.head.num_layers
         self.backbone, self.neck, self.detect = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns)
+        self.detect.inference_with_mask = False
+        self.neck.inference_with_mask = False
 
         # Init Detect head
         self.stride = self.detect.stride
@@ -47,12 +49,17 @@ class Model(nn.Module):
         mask = [None for _ in range(len(x))]
         n_type = x[0].dtype
         n_device = x[0].device
-        
-        for i in range(len(source_mask)):
+
+        for i in range(min(len(source_mask), len(x))):
             b, g, h, w = x[i].shape
             original_mask_tensor = torch.tensor(source_mask[i], dtype=n_type, device=n_device)
-            mask[i] = F.interpolate(original_mask_tensor.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest')
-            mask[i] = mask[i].expand(b, g, -1, -1)
+            interpolated_mask = F.interpolate(original_mask_tensor.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest')
+            expanded_mask = interpolated_mask.expand(b, g, -1, -1)
+            
+            # Check if the tensor is all zeros. If it is, set the mask entry to None.
+            if not expanded_mask.eq(0).all():
+                mask[i] = expanded_mask
+
         torch.save(mask, "masks.pt")
 
 
