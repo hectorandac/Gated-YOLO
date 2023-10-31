@@ -19,12 +19,16 @@ model = dict(
         ),
     head=dict(
         type='EffiDeHead',
-        in_channels=[64, 128, 256, 512, 1024],
-        num_layers=5,
+        in_channels=[64, 128, 256, 512, 1024],  # Add new in_channels for the fifth layer
+        num_layers=4,
         begin_indices=24,
         anchors=4,
-        out_indices=[17, 20, 23, 26],  # Add new out_index for the fifth layer
-        strides=[8, 16, 32, 64, 128],  # Add new stride for the fifth layer
+        anchors_init=[[11, 9, 17, 16, 29, 22],
+                    [22, 35, 44, 42, 48, 69],
+                    [80, 65, 70, 104, 187, 165],
+                    [90, 74, 115, 130, 250, 213]],
+        out_indices=[17, 20, 23],  # Add new out_index for the fifth layer
+        strides=[8, 16, 32, 64],  # Add new stride for the fifth layer
         atss_warmup_epoch=0,
         iou_type='giou',
         use_dfl=True,
