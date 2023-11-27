@@ -70,118 +70,137 @@ class Inferer:
 
         LOGGER.info("Switch model to deploy modality.")
 
-    def infer(self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True, analyze=False, inference_with_mask=False, masks=None, only_analyze = False, annotations_path = 'runs/inference/exp/labels/video1.txt'):
-        if not only_analyze:
-            ''' Model Inference and results visualization '''
-            if inference_with_mask:
-                assert masks is not None
-                print("Processing with mask")
-                self.model.model.detect.inference_with_mask = True
-                self.model.model.detect.masks = torch.load(masks)
-                
-                self.model.model.neck.inference_with_mask = True
-                self.model.model.neck.masks = torch.load(masks)
-
-            vid_path, vid_writer, windows = None, None, []
-            fps_calculator = CalcFPS()
-            min_fps = float('inf')
-            max_fps = 0
-
-            for img_src, img_path, vid_cap in tqdm(self.files):
-                img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
-                img = img.to(self.device)
-                if len(img.shape) == 3:
-                    img = img[None]
-                    # expand for batch dim
-                t1 = time.time()
-                pred_results = self.model(img)
-                det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
-                t2 = time.time()
-
-                if self.webcam:
-                    save_path = osp.join(save_dir, self.webcam_addr)
-                    txt_path = osp.join(save_dir, self.webcam_addr)
-                else:
-                    # Create output files in nested dirs that mirrors the structure of the images' dirs
-                    rel_path = osp.relpath(osp.dirname(img_path), osp.dirname(self.source))
-                    save_path = osp.join(save_dir, rel_path, osp.basename(img_path))  # im.jpg
-                    txt_path = osp.join(save_dir, rel_path, 'labels', osp.splitext(osp.basename(img_path))[0])
-                    os.makedirs(osp.join(save_dir, rel_path), exist_ok=True)
-
-                gn = torch.tensor(img_src.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-                img_ori = img_src.copy()
-
-                # check image and font
-                assert img_ori.data.contiguous, 'Image needs to be contiguous. Please apply to input images with np.ascontiguousarray(im).'
-                self.font_check()
-
-                if len(det):
-                    det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
-                    for *xyxy, conf, cls, head_index in reversed(det):
-                        if save_txt:  # Write to file
-                            xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                            line = (cls, *xywh, conf, head_index)
-                            with open(txt_path + '.txt', 'a') as f:
-                                f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-                        if save_img:
-                            class_num = int(cls)  # integer class
-                            head_index_num = int(head_index)
-                            label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
-
-                            self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
-
-                    img_src = np.asarray(img_ori)
-
-                # FPS counter
-                fps_calculator.update(1.0 / (t2 - t1))
-                avg_fps = fps_calculator.accumulate()
-
-                current_fps = 1.0 / (t2 - t1)
-                min_fps = min(min_fps, current_fps)
-                max_fps = max(max_fps, current_fps)
-
-                if self.files.type == 'video':
-                    self.draw_text(
-                        img_src,
-                        f"FPS: {avg_fps:0.1f}",
-                        pos=(20, 20),
-                        font_scale=1.0,
-                        text_color=(204, 85, 17),
-                        text_color_bg=(255, 255, 255),
-                        font_thickness=2,
-                    )
-
-                if view_img:
-                    if img_path not in windows:
-                        windows.append(img_path)
-                        cv2.namedWindow(str(img_path), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                        cv2.resizeWindow(str(img_path), img_src.shape[1], img_src.shape[0])
-                    cv2.imshow(str(img_path), img_src)
-                    cv2.waitKey(1)  # 1 millisecond
-
-                # Save results (image with detections)
-                if save_img:
-                    if self.files.type == 'image':
-                        cv2.imwrite(save_path, img_src)
-                    else:  # 'video' or 'stream'
-                        if vid_path != save_path:  # new video
-                            vid_path = save_path
-                            if isinstance(vid_writer, cv2.VideoWriter):
-                                vid_writer.release()  # release previous video writer
-                            if vid_cap:  # video
-                                fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                                w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                                h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                            else:  # stream
-                                fps, w, h = 30, img_ori.shape[1], img_ori.shape[0]
-                            save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                            vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                        vid_writer.write(img_src)
+    def infer(
+        self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True,
+        analyze=False, inference_with_mask=False, masks=None,
+        enable_gater_net=False, fixed_gates=None, enable_fixed_gates=False):
+        ''' Model Inference and results visualization '''
+        if inference_with_mask:
+            assert masks is not None
+            print("Processing with mask")
+            self.model.model.detect.inference_with_mask = True
+            self.model.model.detect.masks = torch.load(masks)
             
-            print(f"Average FPS: {avg_fps}")
-            print(f"Minimum FPS: {min_fps}")
-            print(f"Maximum FPS: {max_fps}")
+            self.model.model.neck.inference_with_mask = True
+            self.model.model.neck.masks = torch.load(masks)
+
+        if enable_gater_net and enable_fixed_gates:
+            self.model.model.backbone.fixed_gates = torch.load(fixed_gates)
+        
+        self.model.model.neck.enable_gater_net = enable_gater_net
+        self.model.model.neck.enable_fixed_gates = enable_fixed_gates
+        
+        self.model.model.backbone.enable_gater_net = enable_gater_net
+        self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
+        
+        vid_path, vid_writer, windows = None, None, []
+        fps_calculator = CalcFPS()
+        min_fps = float('inf')
+        max_fps = 0
+
+        if analyze and enable_gater_net:
+            gating_accumulator = None
+
+        for img_src, img_path, vid_cap in tqdm(self.files):
+            img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
+            img = img.to(self.device)
+            if len(img.shape) == 3:
+                img = img[None]
+                # expand for batch dim
+            t1 = time.time()
+            pred_results, gating_decision = self.model(img)
+            det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
+            t2 = time.time()
+
+            if analyze and enable_gater_net:
+                if gating_accumulator == None:
+                    gating_accumulator = torch.zeros(gating_decision.shape[1], device=self.device)
+                gating_accumulator += gating_decision.sum(dim=0)
+
+            if self.webcam:
+                save_path = osp.join(save_dir, self.webcam_addr)
+                txt_path = osp.join(save_dir, self.webcam_addr)
+            else:
+                # Create output files in nested dirs that mirrors the structure of the images' dirs
+                rel_path = osp.relpath(osp.dirname(img_path), osp.dirname(self.source))
+                save_path = osp.join(save_dir, rel_path, osp.basename(img_path))  # im.jpg
+                txt_path = osp.join(save_dir, rel_path, 'labels', osp.splitext(osp.basename(img_path))[0])
+                os.makedirs(osp.join(save_dir, rel_path), exist_ok=True)
+
+            gn = torch.tensor(img_src.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            img_ori = img_src.copy()
+
+            # check image and font
+            assert img_ori.data.contiguous, 'Image needs to be contiguous. Please apply to input images with np.ascontiguousarray(im).'
+            self.font_check()
+
+            if len(det):
+                det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
+                for *xyxy, conf, cls, head_index in reversed(det):
+                    if save_txt:  # Write to file
+                        xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        line = (cls, *xywh, conf, head_index)
+                        with open(txt_path + '.txt', 'a') as f:
+                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                    if save_img:
+                        class_num = int(cls)  # integer class
+                        head_index_num = int(head_index)
+                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
+
+                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
+
+                img_src = np.asarray(img_ori)
+
+            # FPS counter
+            fps_calculator.update(1.0 / (t2 - t1))
+            avg_fps = fps_calculator.accumulate()
+
+            current_fps = 1.0 / (t2 - t1)
+            min_fps = min(min_fps, current_fps)
+            max_fps = max(max_fps, current_fps)
+
+            if self.files.type == 'video':
+                self.draw_text(
+                    img_src,
+                    f"FPS: {avg_fps:0.1f}",
+                    pos=(20, 20),
+                    font_scale=1.0,
+                    text_color=(204, 85, 17),
+                    text_color_bg=(255, 255, 255),
+                    font_thickness=2,
+                )
+
+            if view_img:
+                if img_path not in windows:
+                    windows.append(img_path)
+                    cv2.namedWindow(str(img_path), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+                    cv2.resizeWindow(str(img_path), img_src.shape[1], img_src.shape[0])
+                cv2.imshow(str(img_path), img_src)
+                cv2.waitKey(1)  # 1 millisecond
+
+            # Save results (image with detections)
+            if save_img:
+                if self.files.type == 'image':
+                    cv2.imwrite(save_path, img_src)
+                else:  # 'video' or 'stream'
+                    if vid_path != save_path:  # new video
+                        vid_path = save_path
+                        if isinstance(vid_writer, cv2.VideoWriter):
+                            vid_writer.release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, img_ori.shape[1], img_ori.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer.write(img_src)
+        
+        print(f"Average FPS: {avg_fps}")
+        print(f"Minimum FPS: {min_fps}")
+        print(f"Maximum FPS: {max_fps}")
 
         if analyze:
             print("Analyzing detections")
@@ -197,15 +216,40 @@ class Inferer:
             elif self.files.type == 'image':
                 x_image = img_src
 
+            if enable_gater_net:
+                print("Getting gating_frequencies...")
+                # Normalize by the number of samples to get the frequency
+                gating_frequency = gating_accumulator / 3000
+                # Define thresholds
+                threshold_completely_off = 0  # Gate is never active
+                threshold_mostly_off = 0.3    # Gate is active less than 10% of the time
+                threshold_always_on = 1       # Gate is always active
+                # Identify gates that are below the threshold
+                completely_off_gates = (gating_frequency == threshold_completely_off)
+                mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
+                always_on_gates = (gating_frequency == threshold_always_on)
+
+                completely_off_indices = completely_off_gates.nonzero().squeeze()
+                mostly_off_indices = mostly_off_gates.nonzero().squeeze()
+                always_on_indices = always_on_gates.nonzero().squeeze()
+
+                num_filters = gating_accumulator.shape[0]
+                print(f"Percentage of filters that are completely off: {completely_off_indices.numel() / num_filters * 100:.2f}%")
+                print(f"Percentage of filters that are mostly off: {mostly_off_indices.numel() / num_filters * 100:.2f}%")
+                print(f"Percentage of filters that are always active: {always_on_indices.numel() / num_filters * 100:.2f}%")
+
+                print("Storing gates in to gates.pt")
+                torch.save(~completely_off_gates.unsqueeze(0), save_dir + "/gates.pt")
+            
             annotations = self.parse_yolo_annotations(txt_path + '.txt')
-            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], 'heatmap.png', 64000)
+            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)
             
             img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
             img = img.to(self.device)
             if len(img.shape) == 3:
                 img = img[None]
-            self.model.model.prune_regions(img, heat_maps)
-            np.save('kernel.npy', heat_maps)
+            self.model.model.prune_regions(img, heat_maps, save_dir)
+            np.save(save_dir + '/kernel.npy', heat_maps)
 
     def first_and_others(generator):
         iterator = iter(generator)

@@ -39,6 +39,9 @@ def write_tblog(tblogger, epoch, results, lrs, losses):
     tblogger.add_scalar("train/dist_focalloss", losses[1], epoch + 1)
     tblogger.add_scalar("train/cls_loss", losses[2], epoch + 1)
 
+    if len(losses) >= 3:
+        tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
+
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)
     tblogger.add_scalar("x/lr1", lrs[1], epoch + 1)
     tblogger.add_scalar("x/lr2", lrs[2], epoch + 1)

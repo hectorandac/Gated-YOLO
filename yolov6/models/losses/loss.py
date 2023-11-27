@@ -24,8 +24,8 @@ class ComputeLoss:
                  reg_max=16,
                  iou_type='giou',
                  loss_weight={
-                     'class': 1.0,
-                     'iou': 2.5,
+                     'class': 1.3,
+                     'iou': 3.5,
                      'dfl': 0.5},
                  ):
 
@@ -50,14 +50,16 @@ class ComputeLoss:
     def __call__(
         self,
         outputs,
-        targets,
+        targets,        
         epoch_num,
         step_num,
         batch_height,
-        batch_width
+        batch_width,
+        lambda_reg          # regularization weight 
     ):
 
-        feats, pred_scores, pred_distri = outputs
+        feats, pred_scores, pred_distri, gating_decission = outputs
+        
         anchors, anchor_points, n_anchors_list, stride_tensor = \
                generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
 
@@ -165,14 +167,48 @@ class ComputeLoss:
         loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
 
-        loss = self.loss_weight['class'] * loss_cls + \
-               self.loss_weight['iou'] * loss_iou + \
-               self.loss_weight['dfl'] * loss_dfl
+        # Compute gating loss (L1 regularization term)
+        # Compute the gating loss
+        w_cls_adaptive = 1.0
+        w_iou_adaptive = 1.0
+        gating_loss = None
 
-        return loss, \
-            torch.cat(((self.loss_weight['iou'] * loss_iou).unsqueeze(0),
-                         (self.loss_weight['dfl'] * loss_dfl).unsqueeze(0),
-                         (self.loss_weight['class'] * loss_cls).unsqueeze(0))).detach()
+        if gating_decission is not None:
+            gating_loss = torch.norm(gating_decission, 1) / (batch_size * 2)
+            scaling_factor = 2.56
+
+            # Compute adaptive weights
+            w_cls_adaptive = self.adaptive_weight(lambda_reg * gating_loss, loss_cls, self.loss_weight['class'], scaling_factor)
+            w_iou_adaptive = self.adaptive_weight(lambda_reg * gating_loss, loss_iou, self.loss_weight['iou'], scaling_factor)
+
+        # Compute the total loss with adaptive weights
+        loss = w_cls_adaptive * loss_cls + \
+            w_iou_adaptive * loss_iou + \
+            self.loss_weight['dfl'] * loss_dfl
+
+        # Only add gating loss if gating_decission is not None
+        if gating_decission is not None:
+            loss += lambda_reg * gating_loss
+
+        # Prepare the loss components for return
+        loss_components = [
+            (self.loss_weight['iou'] * loss_iou).unsqueeze(0),
+            (self.loss_weight['dfl'] * loss_dfl).unsqueeze(0),
+            (self.loss_weight['class'] * loss_cls).unsqueeze(0)
+        ]
+
+        if gating_decission is not None:
+            loss_components.append((lambda_reg * gating_loss).unsqueeze(0))
+
+        return loss, torch.cat(loss_components).detach()
+    
+    def adaptive_weight(self, gating_loss, other_loss, base_weight, scaling_factor):
+        if gating_loss < other_loss:
+            difference = other_loss - gating_loss
+            artificial_scale = base_weight * (1 + scaling_factor * difference)
+            return artificial_scale
+        else:
+            return base_weight
 
     def preprocess(self, targets, batch_size, scale_tensor):
         targets_list = np.zeros((batch_size, 1, 5)).tolist()

@@ -75,7 +75,7 @@ class Detect(nn.Module):
         self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(),
                                                    requires_grad=False)
 
-    def forward(self, x):
+    def forward(self, x, gating_decisions=None):
         if self.training:
             cls_score_list = []
             reg_distri_list = []
@@ -96,7 +96,7 @@ class Detect(nn.Module):
             cls_score_list = torch.cat(cls_score_list, axis=1)
             reg_distri_list = torch.cat(reg_distri_list, axis=1)
 
-            return x, cls_score_list, reg_distri_list
+            return x, cls_score_list, reg_distri_list, gating_decisions
         else:
             device = x[0].device
             cls_score_list = []
@@ -153,13 +153,8 @@ class Detect(nn.Module):
             pred_bboxes *= stride_tensor
 
             return torch.cat(
-                [
-                    pred_bboxes,
-                    torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype),
-                    cls_score_list,
-                    head_index_list
-                ],
-                axis=-1)
+                [pred_bboxes, torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype), cls_score_list,head_index_list],axis=-1
+                )
 
 
 def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16, num_layers=3):

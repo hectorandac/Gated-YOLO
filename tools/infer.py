@@ -38,9 +38,12 @@ def get_args_parser(add_help=True):
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels.')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences.')
     parser.add_argument('--half', action='store_true', help='whether to use FP16 half-precision inference.')
-    parser.add_argument('--analyze', action='store_true', help='Extract the region importance based on the detections made on a sample of the scene')
+    parser.add_argument('--analyze', action='store_true', help='Extract the region importance based on the detections made on a sample of the scene.')
     parser.add_argument('--masks', type=str, help='Path to the masks.pt file. The masks are used to enhance inference performance by selectively ignoring sections of the image per detection head, based on the provided mask regions, allowing the model to focus only on areas of interest.')
     parser.add_argument('--inference_with_mask', action='store_true', help='Flag to determine whether to perform inference with the provided masks, allowing the model to focus only on the areas of interest and potentially enhancing performance.')
+    parser.add_argument('--enable-gater-net', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--enable-fixed-gates', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--fixed-gates', type=str, help='Enables the gater-net at the neck level to recognize unused filters.')
 
 
     args = parser.parse_args()
@@ -72,7 +75,10 @@ def run(weights=osp.join(ROOT, 'yolov6s.pt'),
         half=False,
         analyze=False,
         inference_with_mask=False,
-        masks=None
+        masks=None,
+        enable_gater_net=False,
+        fixed_gates=None,
+        enable_fixed_gates=False
         ):
     """ Inference process, supporting inference on one image file or directory which containing images.
     Args:
@@ -96,23 +102,41 @@ def run(weights=osp.join(ROOT, 'yolov6s.pt'),
         half: Use FP16 half-precision inference, e.g. False
     """
     # create save dir
+    # Function to get the next available directory name with an incremental number
+    def get_next_dir_name(base_dir, name):
+        counter = 1
+        new_dir = osp.join(base_dir, f"{name}{counter}")
+        while osp.exists(new_dir):
+            counter += 1
+            new_dir = osp.join(base_dir, f"{name}{counter}")
+        return new_dir
+
     if save_dir is None:
         save_dir = osp.join(project, name)
         save_txt_path = osp.join(save_dir, 'labels')
     else:
         save_txt_path = save_dir
-    if (not not_save_img or save_txt) and not osp.exists(save_dir):
-        os.makedirs(save_dir)
-    else:
-        LOGGER.warning('Save directory already existed')
+
+    # Check if directory exists and create a new one with an incremental number if necessary
+    if (not not_save_img or save_txt):
+        if not osp.exists(save_dir):
+            os.makedirs(save_dir)
+        else:
+            LOGGER.warning('Save directory already existed. Creating a new directory with an incremental number.')
+            save_dir = get_next_dir_name(project, name)  # Update save_dir with new directory name
+            os.makedirs(save_dir)
+            save_txt_path = osp.join(save_dir, 'labels')
+
     if save_txt:
-        save_txt_path = osp.join(save_dir, 'labels')
         if not osp.exists(save_txt_path):
             os.makedirs(save_txt_path)
 
     # Inference
     inferer = Inferer(source, webcam, webcam_addr, weights, device, yaml, img_size, half)
-    inferer.infer(conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, not not_save_img, hide_labels, hide_conf, view_img, analyze, inference_with_mask, masks)
+    inferer.infer(
+        conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, not not_save_img,
+        hide_labels, hide_conf, view_img, analyze, inference_with_mask, masks,
+        enable_gater_net, fixed_gates, enable_fixed_gates)
 
     if save_txt or not not_save_img:
         LOGGER.info(f"Results saved to {save_dir}")

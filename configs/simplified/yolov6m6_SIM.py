@@ -12,7 +12,7 @@ model = dict(
         fuse_P2=True,
         ),
     neck=dict(
-        type='CSPRepBiFPANNeck_P6SIM',
+        type='CSPRepBiFPANNeckSim_P6',
         num_repeats=[12, 12, 12, 12, 12, 12],
         out_channels=[512, 256, 128, 256, 512, 1024],
         csp_e=float(2)/3,

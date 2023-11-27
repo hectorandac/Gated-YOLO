@@ -106,8 +106,21 @@ class Trainer:
         self.height = args.height
         self.width = args.width
 
-        self.loss_num = 3
-        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss']
+        self.enable_gater_net = args.enable_gater_net
+        self.enable_fixed_gates = args.enable_fixed_gates
+        self.fixed_gates = args.fixed_gates
+
+        self.model.neck.enable_gater_net = args.enable_gater_net
+        self.model.neck.enable_fixed_gates = args.enable_fixed_gates
+        self.model.neck.fixed_gates = args.fixed_gates
+
+        self.model.backbone.enable_gater_net = args.enable_gater_net
+        self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
+        self.model.backbone.fixed_gates = args.fixed_gates
+
+        self.loss_num = 4 if args.enable_gater_net else 3
+        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
+
         if self.args.distill:
             self.loss_num += 1
             self.loss_info += ['cwd_loss']
@@ -168,7 +181,7 @@ class Trainer:
                 loss_items += loss_items_ab
             else:
                 total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num,
-                                                            batch_height, batch_width) # YOLOv6_af
+                                                            batch_height, batch_width, 0.001) # YOLOv6_af
             if self.rank != -1:
                 total_loss *= self.world_size
         # backward
@@ -232,7 +245,11 @@ class Trainer:
                             task='train',
                             specific_shape=self.specific_shape,
                             height=self.height,
-                            width=self.width
+                            width=self.width,
+                            masks=None,
+                            enable_gater_net=self.enable_gater_net,
+                            fixed_gates=self.fixed_gates,
+                            enable_fixed_gates=self.enable_fixed_gates
                             )
         else:
             def get_cfg_value(cfg_dict, value_str, default_value):
@@ -281,6 +298,7 @@ class Trainer:
         self.best_ap, self.ap = 0.0, 0.0
         self.best_stop_strong_aug_ap = 0.0
         self.evaluate_results = (0, 0) # AP50, AP50_95
+        
         # resume results
         if hasattr(self, "ckpt"):
             self.evaluate_results = self.ckpt['results']

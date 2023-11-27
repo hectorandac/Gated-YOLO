@@ -58,6 +58,9 @@ def get_args_parser(add_help=True):
     parser.add_argument('--specific-shape', action='store_true', help='rectangular training')
     parser.add_argument('--height', type=int, default=None, help='image height of model input')
     parser.add_argument('--width', type=int, default=None, help='image width of model input')
+    parser.add_argument('--enable-gater-net', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--enable-fixed-gates', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--fixed-gates', type=str, help='Enables the gater-net at the neck level to recognize unused filters.')
     return parser
 
 

@@ -46,6 +46,11 @@ def get_args_parser(add_help=True):
     parser.add_argument('--specific-shape', action='store_true', help='rectangular training')
     parser.add_argument('--height', type=int, default=None, help='image height of model input')
     parser.add_argument('--width', type=int, default=None, help='image width of model input')
+    parser.add_argument('--masks', type=str, help='Path to the masks.pt file. The masks are used to enhance inference performance by selectively ignoring sections of the image per detection head, based on the provided mask regions, allowing the model to focus only on areas of interest.')
+    parser.add_argument('--inference_with_mask', action='store_true', help='Flag to determine whether to perform inference with the provided masks, allowing the model to focus only on the areas of interest and potentially enhancing performance.')
+    parser.add_argument('--enable-gater-net', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--enable-fixed-gates', action='store_true', help='Enables the gater-net at the neck level to recognize unused filters.')
+    parser.add_argument('--fixed-gates', type=str, help='Enables the gater-net at the neck level to recognize unused filters.')
     args = parser.parse_args()
 
     if args.config_file:
@@ -113,7 +118,11 @@ def run(data,
         config_file=None,
         specific_shape=False,
         height=640,
-        width=640
+        width=640,
+        masks=None,
+        enable_gater_net=False,
+        fixed_gates=None,
+        enable_fixed_gates=False
         ):
     """ Run the evaluation process
 
@@ -150,6 +159,15 @@ def run(data,
                 verbose, do_coco_metric, do_pr_metric,
                 plot_curve, plot_confusion_matrix,
                 specific_shape=specific_shape,height=height, width=width)
+
+    model.neck.enable_gater_net = enable_gater_net
+    model.neck.enable_fixed_gates = enable_fixed_gates
+    model.neck.fixed_gates = fixed_gates
+
+    model.backbone.enable_gater_net = enable_gater_net
+    model.backbone.enable_fixed_gates = enable_fixed_gates
+    model.backbone.fixed_gates = fixed_gates
+    
     model = val.init_model(model, weights, task)
     dataloader = val.init_data(dataloader, task)
 

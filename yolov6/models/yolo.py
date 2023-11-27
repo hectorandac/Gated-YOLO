@@ -34,17 +34,44 @@ class Model(nn.Module):
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
-        x = self.backbone(x)
+        '''if self.training:
+            x, gating_decission = self.backbone(x)
+            x, gating_decission = self.neck(x, gating_decission)
+            if not export_mode:
+                featmaps = []
+                featmaps.extend(x)
+            x = self.detect(x, gating_decission)
+            return x if export_mode is True else [x, featmaps]
+        else:'''
+        x, gating_decisions = self.backbone(x)
+        if gating_decisions is None:
+            x = self.neck(x)
+            if not export_mode:
+                featmaps = []
+                featmaps.extend(x)
+            x = self.detect(x)
+            return x if export_mode is True else [x, featmaps]
+        else:
+            x, gating_decisions = self.neck(x, gating_decisions)
+            if not export_mode:
+                featmaps = []
+                featmaps.extend(x)
+            x = self.detect(x, gating_decisions)
+            return x, gating_decisions
+        
+
+    
+        '''x = self.backbone(x)
         x = self.neck(x)
         if not export_mode:
             featmaps = []
             featmaps.extend(x)
         x = self.detect(x)
-        return x if export_mode is True else [x, featmaps]
+        return x, None'''
     
-    def prune_regions(self, x, source_mask):
-        x = self.backbone(x)
-        x = self.neck(x)
+    def prune_regions(self, x, source_mask, path):
+        x, gating_decisions = self.backbone(x)
+        x, _ = self.neck(x, gating_decisions)
 
         mask = [None for _ in range(len(x))]
         n_type = x[0].dtype
@@ -60,7 +87,7 @@ class Model(nn.Module):
             if not expanded_mask.eq(0).all():
                 mask[i] = expanded_mask
 
-        torch.save(mask, "masks.pt")
+        torch.save(mask, path + "/masks.pt")
 
 
     def _apply(self, fn):
