@@ -110,13 +110,13 @@ class Trainer:
         self.enable_fixed_gates = args.enable_fixed_gates
         self.fixed_gates = args.fixed_gates
 
-        self.model.neck.enable_gater_net = args.enable_gater_net
-        self.model.neck.enable_fixed_gates = args.enable_fixed_gates
-        self.model.neck.fixed_gates = args.fixed_gates
+        self.model.model.neck.enable_gater_net = args.enable_gater_net
+        self.model.model.neck.enable_fixed_gates = args.enable_fixed_gates
+        self.model.model.neck.fixed_gates = args.fixed_gates
 
-        self.model.backbone.enable_gater_net = args.enable_gater_net
-        self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
-        self.model.backbone.fixed_gates = args.fixed_gates
+        self.model.model.backbone.enable_gater_net = args.enable_gater_net
+        self.model.model.backbone.enable_fixed_gates = args.enable_fixed_gates
+        self.model.model.backbone.fixed_gates = args.fixed_gates
 
         self.loss_num = 4 if args.enable_gater_net else 3
         self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
