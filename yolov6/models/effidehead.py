@@ -72,22 +72,25 @@ class Detect(nn.Module):
             conv.weight = torch.nn.Parameter(w, requires_grad=True)
 
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
-        self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(),
-                                                   requires_grad=False)
+        self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(), requires_grad=False)
 
-    def forward(self, x, gating_decisions=None):
+    def forward(self, inputs):
+        gates, *x = inputs
+        GaterNetwork.get_next()
         if self.training:
             cls_score_list = []
             reg_distri_list = []
 
             for i in range(self.nl):
-                x[i] = self.stems[i](x[i])
+                x[i] = self.stems[i]((gates, x[i]))[1]
                 cls_x = x[i]
                 reg_x = x[i]
-                cls_feat = self.cls_convs[i](cls_x)
-                cls_output = self.cls_preds[i](cls_feat)
-                reg_feat = self.reg_convs[i](reg_x)
-                reg_output = self.reg_preds[i](reg_feat)
+                cls_feat = self.cls_convs[i]((gates, cls_x))
+                reg_feat = self.reg_convs[i]((gates, reg_x))
+                GaterNetwork.get_next()
+                GaterNetwork.get_next()
+                cls_output = self.cls_preds[i](cls_feat[1])
+                reg_output = self.reg_preds[i](reg_feat[1])
 
                 cls_output = torch.sigmoid(cls_output)
                 cls_score_list.append(cls_output.flatten(2).permute((0, 2, 1)))
@@ -96,7 +99,7 @@ class Detect(nn.Module):
             cls_score_list = torch.cat(cls_score_list, axis=1)
             reg_distri_list = torch.cat(reg_distri_list, axis=1)
 
-            return x, cls_score_list, reg_distri_list, gating_decisions
+            return gates, x, cls_score_list, reg_distri_list
         else:
             device = x[0].device
             cls_score_list = []
@@ -107,22 +110,23 @@ class Detect(nn.Module):
                 b, _, h, w = x[i].shape
                 l = h * w
 
-
                 if self.inference_with_mask and self.masks[i] is None:
                     head_index_list.append(torch.full((b, self.nc, l), i, device=device))
                     cls_score_list.append(torch.zeros([b, self.nc, l], device=device))
                     reg_dist_list.append(torch.zeros([b, 4, l], device=device))
                 else:
-                    x[i] = self.stems[i](x[i])
+                    x[i] = self.stems[i]((gates, x[i]))[1]
 
                     if self.inference_with_mask: x[i] *= self.masks[i]
 
                     cls_x = x[i]
                     reg_x = x[i]
-                    cls_feat = self.cls_convs[i](cls_x)
-                    cls_output = self.cls_preds[i](cls_feat)
-                    reg_feat = self.reg_convs[i](reg_x)
-                    reg_output = self.reg_preds[i](reg_feat)
+                    cls_feat = self.cls_convs[i]((gates, cls_x))
+                    reg_feat = self.reg_convs[i]((gates, reg_x))
+                    GaterNetwork.get_next()
+                    GaterNetwork.get_next()
+                    cls_output = self.cls_preds[i](cls_feat[1])
+                    reg_output = self.reg_preds[i](reg_feat[1])
 
                     if self.use_dfl:
                         reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)

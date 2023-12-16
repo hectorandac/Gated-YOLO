@@ -1,15 +1,18 @@
+import torch
+
 # YOLOv6m model
 model = dict(
     type='YOLOv6m',
-    pretrained='runs/train/Control-YOLOv6M-RAW7/weights/best_ckpt.pt',
+    pretrained='runs/train/Control-YOLOv6M-STRONG_GATE-exp3/weights/best_ckpt.pt',
     depth_multiple=0.60,
     width_multiple=0.75,
     backbone=dict(
-        type='GatedCSPBepBackbone',
+        type='PermanentGatedCSPBepBackbone',
         num_repeats=[1, 6, 12, 18, 6],
         out_channels=[64, 128, 256, 512, 1024],
         csp_e=float(2)/3,
         fuse_P2=True,
+        gates=torch.load('./runs/inference/exp51/gates.pt')
         ),
     neck=dict(
         type='GatedCSPRepBiFPANNeck',

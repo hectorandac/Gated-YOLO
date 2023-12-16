@@ -929,17 +929,26 @@ class CSPRepBiFPANNeck(nn.Module):
         f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
         f_out0 = self.Rep_p4(f_concat_layer0)
 
-        fpn_out1 = self.reduce_layer1(f_out0)
-        f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-        pan_out2 = self.Rep_p3(f_concat_layer1)
+        if self.inference_with_mask and self.masks[0] is None:
+            pan_out2 = torch.zeros_like(x2)
+        else:
+            fpn_out1 = self.reduce_layer1(f_out0)
+            f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
+            pan_out2 = self.Rep_p3(f_concat_layer1)
 
-        down_feat1 = self.downsample2(pan_out2)
-        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-        pan_out1 = self.Rep_n3(p_concat_layer1)
+        if self.inference_with_mask and self.masks[1] is None:
+            pan_out1 = torch.zeros_like(x1)
+        else:
+            down_feat1 = self.downsample2(pan_out2)
+            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+            pan_out1 = self.Rep_n3(p_concat_layer1)
 
-        down_feat0 = self.downsample1(pan_out1)
-        p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-        pan_out0 = self.Rep_n4(p_concat_layer2)
+        if self.inference_with_mask and self.masks[2] is None:
+            pan_out0 = torch.zeros_like(x2)
+        else:
+            down_feat0 = self.downsample1(pan_out1)
+            p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
+            pan_out0 = self.Rep_n4(p_concat_layer2)
 
         outputs = [pan_out2, pan_out1, pan_out0]
 
@@ -1048,41 +1057,40 @@ class GatedCSPRepBiFPANNeck(nn.Module):
         self.comulativeGatesChannels = list(itertools.accumulate(self.gaterChannels))
 
 
-    def forward(self, input, gating_decisions = None):
+    def forward(self, input):
 
-        (x3, x2, x1, x0) = input
+        (gates, x3, x2, x1, x0) = input
 
         if self.enable_gater_net:
-            assert gating_decisions != None
             
-            fpn_out0 = self.reduce_layer0(x0)
-            f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
-            f_out0 = self.Rep_p4(f_concat_layer0) * gating_decisions[:, self.comulativeGatesChannels[4]:self.comulativeGatesChannels[5]].unsqueeze(-1).unsqueeze(-1)
+            fpn_out0 = self.reduce_layer0((gates, x0))
+            f_concat_layer0 = self.Bifusion0((gates, [fpn_out0[1], x1, x2]))
+            f_out0 = self.Rep_p4(f_concat_layer0)
             
             if self.inference_with_mask and self.masks[0] is None:
                 pan_out2 = torch.zeros_like(x2)
             else:
                 fpn_out1 = self.reduce_layer1(f_out0)
-                f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-                pan_out2 = self.Rep_p3(f_concat_layer1) * gating_decisions[:, self.comulativeGatesChannels[5]:self.comulativeGatesChannels[6]].unsqueeze(-1).unsqueeze(-1)
+                f_concat_layer1 = self.Bifusion1((gates, [fpn_out1[1], x2, x3]))
+                pan_out2 = self.Rep_p3(f_concat_layer1)
 
             if self.inference_with_mask and self.masks[1] is None:
                 pan_out1 = torch.zeros_like(x1)
             else:
                 down_feat1 = self.downsample2(pan_out2)
-                p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-                pan_out1 = self.Rep_n3(p_concat_layer1) * gating_decisions[:, self.comulativeGatesChannels[6]:self.comulativeGatesChannels[7]].unsqueeze(-1).unsqueeze(-1)
+                p_concat_layer1 = torch.cat([down_feat1[1], fpn_out1[1]], 1)
+                pan_out1 = self.Rep_n3((gates, p_concat_layer1))
 
             if self.inference_with_mask and self.masks[2] is None:
                 pan_out0 = torch.zeros_like(x0)
             else:
                 down_feat0 = self.downsample1(pan_out1)
-                p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-                pan_out0 = self.Rep_n4(p_concat_layer2) * gating_decisions[:, self.comulativeGatesChannels[7]:self.comulativeGatesChannels[8]].unsqueeze(-1).unsqueeze(-1)
+                p_concat_layer2 = torch.cat([down_feat0[1], fpn_out0[1]], 1)
+                pan_out0 = self.Rep_n4((gates, p_concat_layer2))
 
-            outputs = [pan_out2, pan_out1, pan_out0]
+            outputs = [gates, pan_out2[1], pan_out1[1], pan_out0[1]]
 
-            return outputs, gating_decisions
+            return outputs
 
         fpn_out0 = self.reduce_layer0(x0)
         f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
@@ -1102,7 +1110,7 @@ class GatedCSPRepBiFPANNeck(nn.Module):
 
         outputs = [pan_out2, pan_out1, pan_out0]
 
-        return outputs, None
+        return outputs
 
 class CSPRepPANNeck_P6(nn.Module):
     """CSPRepPANNeck_P6 Module

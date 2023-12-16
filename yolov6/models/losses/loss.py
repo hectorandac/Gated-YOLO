@@ -57,8 +57,7 @@ class ComputeLoss:
         batch_width,
         lambda_reg          # regularization weight 
     ):
-
-        feats, pred_scores, pred_distri, gating_decission = outputs
+        feats, pred_scores, pred_distri, gating_decision = outputs
         
         anchors, anchor_points, n_anchors_list, stride_tensor = \
                generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
@@ -173,9 +172,10 @@ class ComputeLoss:
         w_iou_adaptive = 1.0
         gating_loss = None
 
-        if gating_decission is not None:
-            gating_loss = torch.norm(gating_decission, 1) / (batch_size * 2)
-            scaling_factor = 2.56
+        if gating_decision is not None:
+            gating_decision = torch.cat([gd.flatten() for gd in gating_decision])
+            gating_loss = torch.norm(gating_decision, 1) / (batch_size * 2)
+            scaling_factor = 1.28
 
             # Compute adaptive weights
             w_cls_adaptive = self.adaptive_weight(lambda_reg * gating_loss, loss_cls, self.loss_weight['class'], scaling_factor)
@@ -187,7 +187,7 @@ class ComputeLoss:
             self.loss_weight['dfl'] * loss_dfl
 
         # Only add gating loss if gating_decission is not None
-        if gating_decission is not None:
+        if gating_decision is not None:
             loss += lambda_reg * gating_loss
 
         # Prepare the loss components for return
@@ -197,7 +197,7 @@ class ComputeLoss:
             (self.loss_weight['class'] * loss_cls).unsqueeze(0)
         ]
 
-        if gating_decission is not None:
+        if gating_decision is not None:
             loss_components.append((lambda_reg * gating_loss).unsqueeze(0))
 
         return loss, torch.cat(loss_components).detach()

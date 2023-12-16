@@ -17,13 +17,14 @@ class Model(nn.Module):
     The default parts are EfficientRep Backbone, Rep-PAN and
     Efficient Decoupled Head.
     '''
-    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False):  # model, input channels, number of classes
+    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False, enable_gater_net=False):  # model, input channels, number of classes
         super().__init__()
         # Build network
         num_layers = config.model.head.num_layers
-        self.backbone, self.neck, self.detect = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns)
+        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns)
         self.detect.inference_with_mask = False
         self.neck.inference_with_mask = False
+        self.enable_gater_net = enable_gater_net
 
         # Init Detect head
         self.stride = self.detect.stride
@@ -34,17 +35,8 @@ class Model(nn.Module):
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
-        '''if self.training:
-            x, gating_decission = self.backbone(x)
-            x, gating_decission = self.neck(x, gating_decission)
-            if not export_mode:
-                featmaps = []
-                featmaps.extend(x)
-            x = self.detect(x, gating_decission)
-            return x if export_mode is True else [x, featmaps]
-        else:'''
-        x, gating_decisions = self.backbone(x)
-        if gating_decisions is None:
+        if not self.enable_gater_net:
+            x = self.backbone(x)
             x = self.neck(x)
             if not export_mode:
                 featmaps = []
@@ -52,26 +44,27 @@ class Model(nn.Module):
             x = self.detect(x)
             return x if export_mode is True else [x, featmaps]
         else:
-            x, gating_decisions = self.neck(x, gating_decisions)
+            x = self.gater(x, training=self.training)
+            x = self.backbone(x)
+            x = self.neck(x)
             if not export_mode:
                 featmaps = []
                 featmaps.extend(x)
-            x = self.detect(x, gating_decisions)
-            return x, gating_decisions
-        
-
-    
-        '''x = self.backbone(x)
-        x = self.neck(x)
-        if not export_mode:
-            featmaps = []
-            featmaps.extend(x)
-        x = self.detect(x)
-        return x, None'''
+            if self.training:
+                gates, x, cls_score_list, reg_distri_list = self.detect(x)
+                return (x, cls_score_list, reg_distri_list, gates), gates
+            else:
+                x = self.detect(x)
+                return x 
     
     def prune_regions(self, x, source_mask, path):
-        x, gating_decisions = self.backbone(x)
-        x, _ = self.neck(x, gating_decisions)
+        if not self.enable_gater_net:
+            x = self.backbone(x)
+            x = self.neck(x)
+        else:
+            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
+            x = self.backbone(x, gating_decisions)
+            x = self.neck(x, gating_decisions)
 
         mask = [None for _ in range(len(x))]
         n_type = x[0].dtype
@@ -101,6 +94,14 @@ def make_divisible(x, divisor):
     # Upward revision the value x to make it evenly divisible by the divisor.
     return math.ceil(x / divisor) * divisor
 
+def sort_key(layer_name):
+    parts = layer_name.split('.')
+    # Check if the layer name can be split and has a numerical ID
+    if len(parts) > 1 and parts[1].isdigit():
+        return int(parts[1])
+    else:
+        # Return a default value that keeps the layer in its original position
+        return -1
 
 def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False):
     depth_mul = config.model.depth_multiple
@@ -180,9 +181,59 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
         head_layers = build_effidehead_layer(channels_list, 1, num_classes, reg_max=reg_max, num_layers=num_layers)
         head = Detect(num_classes, num_layers, head_layers=head_layers, use_dfl=use_dfl)
 
-    return backbone, neck, head
+    sections = []
+    backbone_dict = backbone.state_dict()
+    neck_dict = neck.state_dict()
+    head_dict = head.state_dict()
+
+    sorted_head_layers = sorted(head_dict.keys(), key=sort_key)
+    sorted_head_dict = {layer: head_dict[layer] for layer in sorted_head_layers}
+
+    combined_dict = {**backbone_dict, **neck_dict, **sorted_head_dict}
+
+    i = 0
+
+    a_len = len(backbone_dict)
+    b_len = len(neck_dict)
+
+    head_open_count = 0
+
+    for layer_name in combined_dict:
+        if i == (a_len + b_len):
+            print("## HEAD ##")
+        elif i == a_len:
+            print("## NECK ##")
+        elif i == 0:
+            print("## BACKBONE ##")
+        i += 1
+        
+        if ".weight" in layer_name:
+            if i > (a_len + b_len):
+                head_open_count += 1
+            num_gates = combined_dict[layer_name].shape[0]
+            sections.append(num_gates)
+
+            print(f"✅ GATING: {layer_name} with Channels -> {num_gates}")
+        else:
+            print(f"❌ NOT GATING: {layer_name} with Channels -> {num_gates}")
+
+    print(f"Gateable Layer's count {len(sections)}")
+    print(f"Gates on the head: ", head_open_count)
+
+    cumulativeGatesChannels = list(itertools.accumulate(sections))
+    num_filters = sum(sections) if channels_list else 0
+
+    gater = GaterNetwork(
+        feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
+        num_features=204800,         # Number of output features from the feature extractor
+        num_filters=num_filters,
+        sections=cumulativeGatesChannels,
+        bottleneck_size=128,         # Size of the bottleneck in the GaterNetwork
+    )
+
+    return backbone, neck, head, gater
 
 
-def build_model(cfg, num_classes, device, fuse_ab=False, distill_ns=False):
-    model = Model(cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns).to(device)
+def build_model(cfg, num_classes, device, fuse_ab=False, distill_ns=False, enable_gater_net=False):
+    model = Model(cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net).to(device)
     return model

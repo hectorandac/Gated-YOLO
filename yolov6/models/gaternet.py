@@ -3,12 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
+current_index = -1
+
 class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, bottleneck_size):
+
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size):
         super().__init__()
         # Feature extractor (E)
         self.feature_extractor = feature_extractor_arch(pretrained=False)
-        self.feature_extractor = nn.Sequential(*list(self.feature_extractor.children())[:-1])  # Remove the classifier
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.adaptive_pool = nn.AdaptiveAvgPool2d((20, 20))
@@ -17,10 +19,11 @@ class GaterNetwork(nn.Module):
         
         # Batch Normalization
         self.batch_norm = nn.BatchNorm1d(bottleneck_size)
-        
-        # L1 Regularization is applied during loss calculation, not as a layer
+        self.sections = sections
 
-    def forward(self, x, training=False, epsilon=None):
+    def forward(self, x, training=False):
+        global current_index
+
         # Feature extraction
         f = self.feature_extractor(x)
         f = self.adaptive_pool(f) 
@@ -35,8 +38,9 @@ class GaterNetwork(nn.Module):
         g0 = self.fc2(f0)
         
         if training:
+            ## SEM HASH
             # During training, add noise and use both g_alpha (real-valued) and g_beta (binary)
-            noise = torch.randn_like(g0) * epsilon
+            noise = torch.randn_like(g0) * 1.0 # epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
             g_beta = (g0_noisy > 0).float()
@@ -44,8 +48,24 @@ class GaterNetwork(nn.Module):
         else:
             # During inference, always use the binary gates
             g = (g0 > 0).float()
+
+        section_gates_list = []
+        start_idx = 0
+        for end_idx in self.sections:
+            if len(section_gates_list) > (len(self.sections) - 25):
+                section_gates_list.append(torch.ones_like(g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1)))
+            else:
+                section_gates_list.append(g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1))
+            start_idx = end_idx
         
-        return g
+        current_index = -1
+        return section_gates_list, x
+    
+    @staticmethod
+    def get_next():
+        global current_index
+        current_index += 1
+        return current_index
     
     @staticmethod
     def create_feature_extractor_resnet18(pretrained=True):
