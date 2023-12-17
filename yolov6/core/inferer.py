@@ -41,6 +41,28 @@ class Inferer:
 
         # Switch model to deploy status
         self.model_switch(self.model.model, self.img_size)
+        
+        ckpt = torch.load(weights, map_location=self.device)  # load
+        model = ckpt['ema' if ckpt.get('ema') else 'model'].float()
+        original_state_dict = model.state_dict()
+        new_state_dict = self.model.model.state_dict()
+
+        for dict_layer in new_state_dict:
+            if ".weight" in dict_layer:
+                layer_info = f"Deployment Layer: {dict_layer}"
+                loaded_shape_info = f"Loaded shape: {new_state_dict[dict_layer].shape}"
+
+                print(f"{layer_info:80} {loaded_shape_info:60}")
+    
+        for dict_layer in original_state_dict:
+            if ".weight" in dict_layer:
+                layer_info = f"Layer: {dict_layer}"
+                loaded_shape_info = f"Loaded shape: {original_state_dict[dict_layer].shape}"
+                model_shape_info = ""
+                if dict_layer in new_state_dict:
+                    model_shape_info = f"New Model shape: {new_state_dict[dict_layer].shape}"
+
+                print(f"{layer_info:80} {loaded_shape_info:60} {model_shape_info:40}")
 
         # Half precision
         if self.half & (self.device.type != 'cpu'):
@@ -113,9 +135,13 @@ class Inferer:
             t2 = time.time()
 
             if analyze and enable_gater_net:
-                if gating_accumulator == None:
-                    gating_accumulator = torch.zeros(gating_decision.shape[1], device=self.device)
-                gating_accumulator += gating_decision.sum(dim=0)
+                if gating_accumulator is None:
+                    # Initialize gating_accumulator with the same shape as gating_decision, except for the batch dimension
+                    gating_accumulator = [torch.zeros_like(gd.sum(dim=0, keepdim=True)) for gd in gating_decision]
+                
+                for i, gd in enumerate(gating_decision):
+                    # Sum gd over batch dimension while keeping the dimension
+                    gating_accumulator[i] += gd.sum(dim=0, keepdim=True)
 
             if self.webcam:
                 save_path = osp.join(save_dir, self.webcam_addr)
@@ -218,28 +244,38 @@ class Inferer:
 
             if enable_gater_net:
                 print("Getting gating_frequencies...")
-                # Normalize by the number of samples to get the frequency
-                gating_frequency = gating_accumulator / 3000
-                # Define thresholds
-                threshold_completely_off = 0  # Gate is never active
-                threshold_mostly_off = 0.3    # Gate is active less than 10% of the time
-                threshold_always_on = 1       # Gate is always active
-                # Identify gates that are below the threshold
-                completely_off_gates = (gating_frequency == threshold_completely_off)
-                mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
-                always_on_gates = (gating_frequency == threshold_always_on)
+                stored_gates = []
+                
+                for i, accumulator in enumerate(gating_accumulator):
+                    # Normalize by the number of samples to get the frequency for this section
+                    gating_frequency = accumulator.squeeze() / 9180  # Ensure accumulator is correctly squeezed
 
-                completely_off_indices = completely_off_gates.nonzero().squeeze()
-                mostly_off_indices = mostly_off_gates.nonzero().squeeze()
-                always_on_indices = always_on_gates.nonzero().squeeze()
+                    # Define thresholds
+                    threshold_completely_off = 0  # Gate is never active
+                    threshold_mostly_off = 0.3    # Gate is active less than 30% of the time
+                    threshold_always_on = 1       # Gate is always active
 
-                num_filters = gating_accumulator.shape[0]
-                print(f"Percentage of filters that are completely off: {completely_off_indices.numel() / num_filters * 100:.2f}%")
-                print(f"Percentage of filters that are mostly off: {mostly_off_indices.numel() / num_filters * 100:.2f}%")
-                print(f"Percentage of filters that are always active: {always_on_indices.numel() / num_filters * 100:.2f}%")
+                    # Identify gates below the threshold for this section
+                    completely_off_gates = (gating_frequency == threshold_completely_off)
+                    mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
+                    always_on_gates = (gating_frequency == threshold_always_on)
+
+                    print(f"Section {i}:")
+                    print(f"  Percentage of filters that are completely off: {completely_off_gates.float().mean() * 100:.2f}%")
+                    print(f"  Percentage of filters that are mostly off: {mostly_off_gates.float().mean() * 100:.2f}%")
+                    print(f"  Percentage of filters that are always active: {always_on_gates.float().mean() * 100:.2f}%")
+
+                    # Check if "completely off" gates exceed 98%
+                    if completely_off_gates.float().mean() > 0.98:
+                        stored_gates.append(None)
+                    else:
+                        gating_decision_for_section = ~completely_off_gates.unsqueeze(0)
+                        stored_gates.append(gating_decision_for_section.unsqueeze(-1).unsqueeze(-1))
 
                 print("Storing gates in to gates.pt")
-                torch.save(~completely_off_gates.unsqueeze(0), save_dir + "/gates.pt")
+                torch.save(stored_gates, f"{save_dir}/gates.pt")
+
+
             
             annotations = self.parse_yolo_annotations(txt_path + '.txt')
             heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)

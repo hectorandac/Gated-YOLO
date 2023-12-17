@@ -72,22 +72,22 @@ class Detect(nn.Module):
             conv.weight = torch.nn.Parameter(w, requires_grad=True)
 
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
-        self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(),
-                                                   requires_grad=False)
+        self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(), requires_grad=False)
 
     def forward(self, x, gating_decisions=None):
+        gating_decisions.pop(0)
         if self.training:
             cls_score_list = []
             reg_distri_list = []
 
             for i in range(self.nl):
-                x[i] = self.stems[i](x[i])
+                x[i] = self.stems[i](x[i], gating_decisions)
                 cls_x = x[i]
                 reg_x = x[i]
-                cls_feat = self.cls_convs[i](cls_x)
-                cls_output = self.cls_preds[i](cls_feat)
-                reg_feat = self.reg_convs[i](reg_x)
-                reg_output = self.reg_preds[i](reg_feat)
+                cls_feat = self.cls_convs[i](cls_x, gating_decisions)
+                reg_feat = self.reg_convs[i](reg_x, gating_decisions)
+                cls_output = self.cls_preds[i](cls_feat) * gating_decisions.pop(0)
+                reg_output = self.reg_preds[i](reg_feat) * gating_decisions.pop(0)
 
                 cls_output = torch.sigmoid(cls_output)
                 cls_score_list.append(cls_output.flatten(2).permute((0, 2, 1)))
@@ -96,7 +96,7 @@ class Detect(nn.Module):
             cls_score_list = torch.cat(cls_score_list, axis=1)
             reg_distri_list = torch.cat(reg_distri_list, axis=1)
 
-            return x, cls_score_list, reg_distri_list, gating_decisions
+            return x, cls_score_list, reg_distri_list
         else:
             device = x[0].device
             cls_score_list = []
@@ -107,22 +107,21 @@ class Detect(nn.Module):
                 b, _, h, w = x[i].shape
                 l = h * w
 
-
-                if self.inference_with_mask and self.masks[i] is None:
+                if self.inference_with_mask and self.masks[i] is None or (gating_decisions is not None and gating_decisions[-self.nl + i] is None):
                     head_index_list.append(torch.full((b, self.nc, l), i, device=device))
                     cls_score_list.append(torch.zeros([b, self.nc, l], device=device))
                     reg_dist_list.append(torch.zeros([b, 4, l], device=device))
                 else:
-                    x[i] = self.stems[i](x[i])
+                    x[i] = self.stems[i](x[i], gating_decisions)
 
                     if self.inference_with_mask: x[i] *= self.masks[i]
 
                     cls_x = x[i]
                     reg_x = x[i]
-                    cls_feat = self.cls_convs[i](cls_x)
-                    cls_output = self.cls_preds[i](cls_feat)
-                    reg_feat = self.reg_convs[i](reg_x)
-                    reg_output = self.reg_preds[i](reg_feat)
+                    cls_feat = self.cls_convs[i](cls_x, gating_decisions)
+                    reg_feat = self.reg_convs[i](reg_x, gating_decisions)
+                    cls_output = self.cls_preds[i](cls_feat) * gating_decisions.pop(0)
+                    reg_output = self.reg_preds[i](reg_feat) * gating_decisions.pop(0)
 
                     if self.use_dfl:
                         reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)
@@ -160,7 +159,7 @@ class Detect(nn.Module):
 def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16, num_layers=3):
     chx = [6, 8, 10] if num_layers == 3 else [8, 9, 10, 11, 12]
 
-    head_layers = nn.Sequential(
+    head_layers = GatingSequential(
         # stem0
         ConvBNSiLU(
             in_channels=channels_list[chx[0]],

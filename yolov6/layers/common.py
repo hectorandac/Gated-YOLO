@@ -24,7 +24,7 @@ class SiLU(nn.Module):
 
 
 class ConvModule(nn.Module):
-    '''A combination of Conv + BN + Activation'''
+    '''A combination of Conv + BN + Activation''' "###### I WAS HERE #####"
     def __init__(self, in_channels, out_channels, kernel_size, stride, activation_type, padding=None, groups=1, bias=False):
         super().__init__()
         if padding is None:
@@ -43,16 +43,22 @@ class ConvModule(nn.Module):
             self.act = activation_table.get(activation_type)
         self.activation_type = activation_type
 
-    def forward(self, x):
+    def forward(self, x, gating_decisions):
         if self.activation_type is None:
-            return self.bn(self.conv(x))
-        return self.act(self.bn(self.conv(x)))
+            return self.bn(self.conv(x) * gating_decisions.pop(0)) * gating_decisions.pop(0)
+        
+        return self.act(self.bn(self.conv(x) * gating_decisions.pop(0)) * gating_decisions.pop(0))
 
-    def forward_fuse(self, x):
+    def forward_fuse(self, x, gating_decisions):
         if self.activation_type is None:
-            return self.conv(x)
-        return self.act(self.conv(x))
+            return self.conv(x) * gating_decisions.pop(0)
+        return self.act(self.conv(x) * gating_decisions.pop(0))
 
+class GatingSequential(nn.Sequential):
+    def forward(self, input, gating_decisions):
+        for module in self:
+            input = module(input, gating_decisions)
+        return input
 
 class ConvBNReLU(nn.Module):
     '''Conv and BN with ReLU activation'''
@@ -60,8 +66,8 @@ class ConvBNReLU(nn.Module):
         super().__init__()
         self.block = ConvModule(in_channels, out_channels, kernel_size, stride, 'relu', padding, groups, bias)
 
-    def forward(self, x):
-        return self.block(x)
+    def forward(self, x, gating_decisions):
+        return self.block(x, gating_decisions)
 
 
 class ConvBNSiLU(nn.Module):
@@ -70,8 +76,8 @@ class ConvBNSiLU(nn.Module):
         super().__init__()
         self.block = ConvModule(in_channels, out_channels, kernel_size, stride, 'silu', padding, groups, bias)
 
-    def forward(self, x):
-        return self.block(x)
+    def forward(self, x, gating_decisions):
+        return self.block(x, gating_decisions)
 
 
 class ConvBN(nn.Module):
@@ -103,13 +109,13 @@ class SPPFModule(nn.Module):
         self.cv2 = block(c_ * 4, out_channels, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=kernel_size, stride=1, padding=kernel_size // 2)
 
-    def forward(self, x):
-        x = self.cv1(x)
+    def forward(self, x, gating_decisions):
+        x = self.cv1(x, gating_decisions)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             y1 = self.m(x)
             y2 = self.m(y1)
-            return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1))
+            return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1), gating_decisions)
 
 
 class SimSPPF(nn.Module):
@@ -118,8 +124,8 @@ class SimSPPF(nn.Module):
         super().__init__()
         self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
 
-    def forward(self, x):
-        return self.sppf(x)
+    def forward(self, x, gating_decisions):
+        return self.sppf(x, gating_decisions)
 
 
 class SPPF(nn.Module):
@@ -190,8 +196,8 @@ class Transpose(nn.Module):
             bias=True
         )
 
-    def forward(self, x):
-        return self.upsample_transpose(x)
+    def forward(self, x, gating_decisions):
+        return self.upsample_transpose(x) * gating_decisions.pop(0)
 
 
 class RepVGGBlock(nn.Module):
@@ -242,17 +248,17 @@ class RepVGGBlock(nn.Module):
             self.rbr_dense = ConvModule(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, activation_type=None, padding=padding, groups=groups)
             self.rbr_1x1 = ConvModule(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=stride, activation_type=None, padding=padding_11, groups=groups)
 
-    def forward(self, inputs):
+    def forward(self, inputs, gating_decisions):
         '''Forward process'''
         if hasattr(self, 'rbr_reparam'):
-            return self.nonlinearity(self.se(self.rbr_reparam(inputs)))
+            return self.nonlinearity(self.se(self.rbr_reparam(inputs) * gating_decisions.pop(0)))
 
         if self.rbr_identity is None:
             id_out = 0
         else:
-            id_out = self.rbr_identity(inputs)
+            id_out = self.rbr_identity(inputs) * gating_decisions.pop(0)
 
-        return self.nonlinearity(self.se(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out))
+        return self.nonlinearity(self.se(self.rbr_dense(inputs, gating_decisions) + self.rbr_1x1(inputs, gating_decisions) + id_out))
 
     def get_equivalent_kernel_bias(self):
         kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_dense)
@@ -574,16 +580,16 @@ class RepBlock(nn.Module):
         super().__init__()
 
         self.conv1 = block(in_channels, out_channels)
-        self.block = nn.Sequential(*(block(out_channels, out_channels) for _ in range(n - 1))) if n > 1 else None
+        self.block = GatingSequential(*(block(out_channels, out_channels) for _ in range(n - 1))) if n > 1 else None
         if block == BottleRep:
             self.conv1 = BottleRep(in_channels, out_channels, basic_block=basic_block, weight=True)
             n = n // 2
-            self.block = nn.Sequential(*(BottleRep(out_channels, out_channels, basic_block=basic_block, weight=True) for _ in range(n - 1))) if n > 1 else None
+            self.block = GatingSequential(*(BottleRep(out_channels, out_channels, basic_block=basic_block, weight=True) for _ in range(n - 1))) if n > 1 else None
 
-    def forward(self, x):
-        x = self.conv1(x)
+    def forward(self, x, gating_decsions):
+        x = self.conv1(x, gating_decsions)
         if self.block is not None:
-            x = self.block(x)
+            x = self.block(x, gating_decsions)
         return x
 
 
@@ -602,9 +608,9 @@ class BottleRep(nn.Module):
         else:
             self.alpha = 1.0
 
-    def forward(self, x):
-        outputs = self.conv1(x)
-        outputs = self.conv2(outputs)
+    def forward(self, x, gatin_decisions):
+        outputs = self.conv1(x, gatin_decisions)
+        outputs = self.conv2(outputs, gatin_decisions)
         return outputs + self.alpha * x if self.shortcut else outputs
 
 
@@ -638,16 +644,16 @@ class BepC3(nn.Module):
         c_ = int(out_channels * e)  # hidden channels
         self.cv1 = ConvBNReLU(in_channels, c_, 1, 1)
         self.cv2 = ConvBNReLU(in_channels, c_, 1, 1)
+        self.m = RepBlock(in_channels=c_, out_channels=c_, n=n, block=BottleRep, basic_block=block)
         self.cv3 = ConvBNReLU(2 * c_, out_channels, 1, 1)
         if block == ConvBNSiLU:
             self.cv1 = ConvBNSiLU(in_channels, c_, 1, 1)
             self.cv2 = ConvBNSiLU(in_channels, c_, 1, 1)
             self.cv3 = ConvBNSiLU(2 * c_, out_channels, 1, 1)
 
-        self.m = RepBlock(in_channels=c_, out_channels=c_, n=n, block=BottleRep, basic_block=block)
 
-    def forward(self, x):
-        return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
+    def forward(self, x, gating_decisions):
+        return self.cv3(torch.cat((self.m(self.cv1(x, gating_decisions), gating_decisions), self.cv2(x, gating_decisions)), dim=1), gating_decisions)
 
 
 class MBLABlock(nn.Module):
@@ -696,14 +702,14 @@ class BiFusion(nn.Module):
     '''BiFusion Block in PAN'''
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.cv1 = ConvBNReLU(in_channels[0], out_channels, 1, 1)
-        self.cv2 = ConvBNReLU(in_channels[1], out_channels, 1, 1)
-        self.cv3 = ConvBNReLU(out_channels * 3, out_channels, 1, 1)
-
         self.upsample = Transpose(
             in_channels=out_channels,
             out_channels=out_channels,
         )
+
+        self.cv1 = ConvBNReLU(in_channels[0], out_channels, 1, 1)
+        self.cv2 = ConvBNReLU(in_channels[1], out_channels, 1, 1)
+
         self.downsample = ConvBNReLU(
             in_channels=out_channels,
             out_channels=out_channels,
@@ -711,11 +717,13 @@ class BiFusion(nn.Module):
             stride=2
         )
 
-    def forward(self, x):
-        x0 = self.upsample(x[0])
-        x1 = self.cv1(x[1])
-        x2 = self.downsample(self.cv2(x[2]))
-        return self.cv3(torch.cat((x0, x1, x2), dim=1))
+        self.cv3 = ConvBNReLU(out_channels * 3, out_channels, 1, 1)
+
+    def forward(self, x, gating_decisions):
+        x0 = self.upsample(x[0], gating_decisions)
+        x1 = self.cv1(x[1], gating_decisions)
+        x2 = self.downsample(self.cv2(x[2], gating_decisions), gating_decisions)
+        return self.cv3(torch.cat((x0, x1, x2), dim=1), gating_decisions)
 
 
 def get_block(mode):

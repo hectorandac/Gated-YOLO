@@ -4,11 +4,10 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, bottleneck_size):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size):
         super().__init__()
         # Feature extractor (E)
         self.feature_extractor = feature_extractor_arch(pretrained=False)
-        self.feature_extractor = nn.Sequential(*list(self.feature_extractor.children())[:-1])  # Remove the classifier
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.adaptive_pool = nn.AdaptiveAvgPool2d((20, 20))
@@ -17,8 +16,7 @@ class GaterNetwork(nn.Module):
         
         # Batch Normalization
         self.batch_norm = nn.BatchNorm1d(bottleneck_size)
-        
-        # L1 Regularization is applied during loss calculation, not as a layer
+        self.sections = sections
 
     def forward(self, x, training=False, epsilon=None):
         # Feature extraction
@@ -35,6 +33,7 @@ class GaterNetwork(nn.Module):
         g0 = self.fc2(f0)
         
         if training:
+            ## SEM HASH
             # During training, add noise and use both g_alpha (real-valued) and g_beta (binary)
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
@@ -44,8 +43,15 @@ class GaterNetwork(nn.Module):
         else:
             # During inference, always use the binary gates
             g = (g0 > 0).float()
+
+        section_gates_list = []
+        start_idx = 0
+        print(self.sections)
+        for end_idx in self.sections:
+            section_gates_list.append(g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1))
+            start_idx = end_idx
         
-        return g
+        return section_gates_list
     
     @staticmethod
     def create_feature_extractor_resnet18(pretrained=True):

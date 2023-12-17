@@ -110,13 +110,13 @@ class Trainer:
         self.enable_fixed_gates = args.enable_fixed_gates
         self.fixed_gates = args.fixed_gates
 
-        self.model.model.neck.enable_gater_net = args.enable_gater_net
-        self.model.model.neck.enable_fixed_gates = args.enable_fixed_gates
-        self.model.model.neck.fixed_gates = args.fixed_gates
+        self.model.neck.enable_gater_net = args.enable_gater_net
+        self.model.neck.enable_fixed_gates = args.enable_fixed_gates
+        self.model.neck.fixed_gates = args.fixed_gates
 
-        self.model.model.backbone.enable_gater_net = args.enable_gater_net
-        self.model.model.backbone.enable_fixed_gates = args.enable_fixed_gates
-        self.model.model.backbone.fixed_gates = args.fixed_gates
+        self.model.backbone.enable_gater_net = args.enable_gater_net
+        self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
+        self.model.backbone.fixed_gates = args.fixed_gates
 
         self.loss_num = 4 if args.enable_gater_net else 3
         self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
@@ -164,6 +164,7 @@ class Trainer:
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
             preds, s_featmaps = self.model(images)
+            self.gates = preds[3]
             if self.args.distill:
                 with torch.no_grad():
                     t_preds, t_featmaps = self.teacher_model(images)
@@ -181,7 +182,7 @@ class Trainer:
                 loss_items += loss_items_ab
             else:
                 total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num,
-                                                            batch_height, batch_width, 0.001) # YOLOv6_af
+                                                            batch_height, batch_width, 0.0001) # YOLOv6_af
             if self.rank != -1:
                 total_loss *= self.world_size
         # backward
@@ -229,7 +230,7 @@ class Trainer:
             self.evaluate_results = list(self.evaluate_results)
 
             # log for tensorboard
-            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss)
+            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss, self.gates)
             # save validation predictions to tensorboard
             write_tbimg(self.tblogger, self.vis_imgs_list, self.epoch, type='val')
 
@@ -431,7 +432,7 @@ class Trainer:
             assert not self.args.distill, 'ERROR in: YOLOv6-lite models not support distill mode.'
             model = build_lite_model(cfg, nc, device)
         else:
-            model = build_model(cfg, nc, device, fuse_ab=self.args.fuse_ab, distill_ns=self.distill_ns)
+            model = build_model(cfg, nc, device, fuse_ab=self.args.fuse_ab, distill_ns=self.distill_ns, enable_gater_net=args.enable_gater_net)
         weights = cfg.model.pretrained
         if weights:  # finetune if pretrained model is set
             if not os.path.exists(weights):
