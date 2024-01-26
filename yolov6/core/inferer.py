@@ -14,10 +14,12 @@ from PIL import ImageFont
 from collections import deque
 
 from yolov6.utils.events import LOGGER, load_yaml
-from yolov6.layers.common import DetectBackend
+from yolov6.layers.common import DetectBackend, CounterA
 from yolov6.data.data_augment import letterbox
 from yolov6.data.datasets import LoadData
 from yolov6.utils.nms import non_max_suppression
+
+from fvcore.nn import FlopCountAnalysis
 
 from scipy.ndimage import label, binary_dilation, sum as ndi_sum
 from PIL import Image
@@ -41,6 +43,31 @@ class Inferer:
 
         # Switch model to deploy status
         self.model_switch(self.model.model, self.img_size)
+        
+        ckpt = torch.load(weights, map_location=self.device)  # load
+        model = ckpt['ema' if ckpt.get('ema') else 'model'].float()
+        original_state_dict = model.state_dict()
+        new_state_dict = self.model.model.state_dict()
+
+        for dict_layer in new_state_dict:
+            if ".weight" in dict_layer:
+                layer_info = f"Deployment Layer: {dict_layer}"
+                loaded_shape_info = f"Loaded shape: {new_state_dict[dict_layer].shape}"
+                model_shape_info = ""
+                if dict_layer in original_state_dict:
+                    model_shape_info = f"New model shape: {original_state_dict[dict_layer].shape}"
+
+                print(f"{layer_info:80} {loaded_shape_info:60} {model_shape_info:40}")
+    
+        for dict_layer in original_state_dict:
+            if ".weight" in dict_layer:
+                layer_info = f"Layer: {dict_layer}"
+                loaded_shape_info = f"Loaded shape: {original_state_dict[dict_layer].shape}"
+                model_shape_info = ""
+                if dict_layer in new_state_dict:
+                    model_shape_info = f"New Model shape: {new_state_dict[dict_layer].shape}"
+
+                print(f"{layer_info:80} {loaded_shape_info:60} {model_shape_info:40}")
 
         # Half precision
         if self.half & (self.device.type != 'cpu'):
@@ -85,13 +112,16 @@ class Inferer:
             self.model.model.neck.masks = torch.load(masks)
 
         if enable_gater_net and enable_fixed_gates:
-            self.model.model.backbone.fixed_gates = torch.load(fixed_gates)
+            self.model.model.gater.fixed_gates = torch.load(fixed_gates)
         
         self.model.model.neck.enable_gater_net = enable_gater_net
         self.model.model.neck.enable_fixed_gates = enable_fixed_gates
         
         self.model.model.backbone.enable_gater_net = enable_gater_net
         self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
+
+        self.model.model.gater.enable_gater_net = enable_gater_net
+        self.model.model.gater.enable_fixed_gates = enable_fixed_gates
         
         vid_path, vid_writer, windows = None, None, []
         fps_calculator = CalcFPS()
@@ -100,22 +130,33 @@ class Inferer:
 
         if analyze and enable_gater_net:
             gating_accumulator = None
+            base_dim = []
 
         for img_src, img_path, vid_cap in tqdm(self.files):
+            CounterA.reset()
             img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
             img = img.to(self.device)
             if len(img.shape) == 3:
                 img = img[None]
                 # expand for batch dim
             t1 = time.time()
-            pred_results, gating_decision = self.model(img)
+            #pred_results, gating_decision = self.model(img)
+            CounterA.reset()
+            flops = FlopCountAnalysis(self.model, img)
+            print(f"Total FLOPS: {flops.total()}")
             det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
             t2 = time.time()
 
             if analyze and enable_gater_net:
-                if gating_accumulator == None:
-                    gating_accumulator = torch.zeros(gating_decision.shape[1], device=self.device)
-                gating_accumulator += gating_decision.sum(dim=0)
+                if gating_accumulator is None:
+                    # Initialize gating_accumulator with the same shape as gating_decision, except for the batch dimension
+                    gating_accumulator = [torch.zeros_like(gd[0].sum(dim=0, keepdim=True)) for gd in gating_decision]
+                    base_dim = [gd[1] for gd in gating_decision]
+                    print(base_dim)
+                
+                for i, gd in enumerate(gating_decision):
+                    # Sum gd over batch dimension while keeping the dimension
+                    gating_accumulator[i] += gd[0].sum(dim=0, keepdim=True)
 
             if self.webcam:
                 save_path = osp.join(save_dir, self.webcam_addr)
@@ -136,6 +177,7 @@ class Inferer:
 
             if len(det):
                 det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
+                # print(det[0])
                 for *xyxy, conf, cls, head_index in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -144,7 +186,7 @@ class Inferer:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img:
-                        class_num = int(cls)  # integer class
+                        class_num = int(cls) & 8  # integer class
                         head_index_num = int(head_index)
                         label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
 
@@ -201,6 +243,7 @@ class Inferer:
         print(f"Average FPS: {avg_fps}")
         print(f"Minimum FPS: {min_fps}")
         print(f"Maximum FPS: {max_fps}")
+        # print(prof.display(show_events=False))
 
         if analyze:
             print("Analyzing detections")
@@ -218,28 +261,44 @@ class Inferer:
 
             if enable_gater_net:
                 print("Getting gating_frequencies...")
-                # Normalize by the number of samples to get the frequency
-                gating_frequency = gating_accumulator / 3000
-                # Define thresholds
-                threshold_completely_off = 0  # Gate is never active
-                threshold_mostly_off = 0.3    # Gate is active less than 10% of the time
-                threshold_always_on = 1       # Gate is always active
-                # Identify gates that are below the threshold
-                completely_off_gates = (gating_frequency == threshold_completely_off)
-                mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
-                always_on_gates = (gating_frequency == threshold_always_on)
+                stored_gates = []
+                
+                for i, accumulator in enumerate(gating_accumulator):
+                    # Normalize by the number of samples to get the frequency for this section
+                    gating_frequency = accumulator.squeeze() / 9180  # Ensure accumulator is correctly squeezed
 
-                completely_off_indices = completely_off_gates.nonzero().squeeze()
-                mostly_off_indices = mostly_off_gates.nonzero().squeeze()
-                always_on_indices = always_on_gates.nonzero().squeeze()
+                    # Define thresholds
+                    threshold_completely_off = 0  # Gate is never active
+                    threshold_mostly_off = 0.3    # Gate is active less than 30% of the time
+                    threshold_always_on = 1       # Gate is always active
 
-                num_filters = gating_accumulator.shape[0]
-                print(f"Percentage of filters that are completely off: {completely_off_indices.numel() / num_filters * 100:.2f}%")
-                print(f"Percentage of filters that are mostly off: {mostly_off_indices.numel() / num_filters * 100:.2f}%")
-                print(f"Percentage of filters that are always active: {always_on_indices.numel() / num_filters * 100:.2f}%")
+                    # Identify gates below the threshold for this section
+                    completely_off_gates = (gating_frequency == threshold_completely_off)
+                    mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
+                    always_on_gates = (gating_frequency == threshold_always_on)
+
+                    print(f"Section {i}:")
+                    print(f"  Percentage of filters that are completely off: {completely_off_gates.float().mean() * 100:.2f}%")
+                    print(f"  Percentage of filters that are mostly off: {mostly_off_gates.float().mean() * 100:.2f}%")
+                    print(f"  Percentage of filters that are always active: {always_on_gates.float().mean() * 100:.2f}%")
+
+                    # Check if "completely off" gates exceed 98%
+                    if completely_off_gates.float().mean() > 0.99 and base_dim[i] is not None:
+                        stored_gates.append([None, base_dim[i]])
+                    else:
+                        gating_decision_for_section = ~completely_off_gates.unsqueeze(0)
+                        stored_gates.append([gating_decision_for_section.unsqueeze(-1).unsqueeze(-1), None])
+
+                for section in stored_gates:
+                    gate = ""
+                    if section[0] is not None:
+                        gate = section[0].shape
+                    print(F"Gate: {gate}, Tensor dimension: {section[1]}")
 
                 print("Storing gates in to gates.pt")
-                torch.save(~completely_off_gates.unsqueeze(0), save_dir + "/gates.pt")
+                torch.save(stored_gates, f"{save_dir}/gates.pt")
+
+
             
             annotations = self.parse_yolo_annotations(txt_path + '.txt')
             heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)

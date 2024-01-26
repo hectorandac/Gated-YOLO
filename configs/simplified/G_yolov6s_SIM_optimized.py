@@ -1,7 +1,7 @@
 # YOLOv6s model
 model = dict(
     type='YOLOv6s',
-    pretrained='weights/yolov6s.pt',
+    pretrained='runs/train/Control-YOLOv6S-STRONG_GATE-exp11/weights/best_ckpt.pt',
     depth_multiple=0.33,
     width_multiple=0.50,
     backbone=dict(
@@ -12,7 +12,7 @@ model = dict(
         cspsppf=True,
         ),
     neck=dict(
-        type='GatedRepBiFPANNeck',
+        type='RepBiFPANNeck',
         num_repeats=[12, 12, 12, 12],
         out_channels=[256, 128, 128, 256, 256, 512],
         ),

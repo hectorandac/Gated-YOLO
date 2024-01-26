@@ -4,7 +4,11 @@ import os
 import yaml
 import logging
 import shutil
-
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import csv
 
 def set_logging(name=None):
     rank = int(os.getenv('RANK', -1))
@@ -29,8 +33,43 @@ def save_yaml(data_dict, save_path):
     with open(save_path, 'w') as f:
         yaml.safe_dump(data_dict, f, sort_keys=False)
 
+def calculate_open_gates_percentage(gates):
+    # Assuming gates is a 1D tensor of binary values (0 or 1)
+    num_open_gates = gates[0].sum()
+    total_gates = gates[0].numel()  # Total number of gates in the tensor
+    percentage_open = (num_open_gates / total_gates) * 100
+    return percentage_open.item()  # Convert to a Python number if necessary
 
-def write_tblog(tblogger, epoch, results, lrs, losses):
+def data_to_image(data):
+    """Converts the matplotlib plot specified by 'figure' to a NumPy image array."""
+    # Attach the figure to a canvas and draw it
+    canvas = FigureCanvas(data)
+    canvas.draw()
+
+    # Convert to a NumPy array
+    image = np.array(canvas.buffer_rgba())
+
+    # Close the figure to free memory
+    plt.close(data)
+
+    return image
+
+def save_proportions_to_file(proportions, filename='gate_proportions.csv'):
+    with open(filename, 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(proportions)
+
+#def load_proportions_from_file(filename='gate_proportions.csv'):
+#    proportions = []
+#    with open(filename, newline='') as file:
+#        reader = csv.reader(file)
+#        for row in reader:
+#            proportions.append([float(val) for val in row])
+#    return proportions
+
+#data_over_time = load_proportions_from_file()
+
+def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
     """Display mAP and loss information to log."""
     tblogger.add_scalar("val/mAP@0.5", results[0], epoch + 1)
     tblogger.add_scalar("val/mAP@0.50:0.95", results[1], epoch + 1)
@@ -39,8 +78,21 @@ def write_tblog(tblogger, epoch, results, lrs, losses):
     tblogger.add_scalar("train/dist_focalloss", losses[1], epoch + 1)
     tblogger.add_scalar("train/cls_loss", losses[2], epoch + 1)
 
-    if len(losses) >= 3:
+    if len(losses) >= 4:
         tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
+        percentage_open_gates = [calculate_open_gates_percentage(layer_gates) for layer_gates in gates]
+        save_proportions_to_file(percentage_open_gates)
+        tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1, bins=100)
+
+        # Generate heatmap data
+        #data_over_time.append(percentage_open_gates)
+
+        ## Create a heatmap figure
+        #fig, ax = plt.subplots()
+        #sns.heatmap(data_over_time, annot=False, cmap='viridis', ax=ax)
+        #image = data_to_image(fig)
+        #tblogger.add_image(f'Gates progression', image, epoch + 1, dataformats='HWC')
+            
 
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)
     tblogger.add_scalar("x/lr1", lrs[1], epoch + 1)

@@ -1,0 +1,11 @@
+\begin{thebibliography}{1}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{redmon2016you}
+Redmon, J., Divvala, S., Girshick, R., Farhadi, A.: You only look once:
+  Unified, real-time object detection. In: Proceedings of the IEEE conference
+  on computer vision and pattern recognition. pp. 779--788 (2016)
+
+\end{thebibliography}

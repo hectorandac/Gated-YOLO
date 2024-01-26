@@ -30,8 +30,8 @@ def xywh2xyxy(x):
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, multi_label=False, max_det=300):
     """Runs Non-Maximum Suppression (NMS) on inference results."""
 
-    num_classes = prediction.shape[2] - 6
-    pred_candidates = torch.logical_and(prediction[..., 4] > conf_thres, torch.max(prediction[..., 5:-1], axis=-1)[0] > conf_thres)  # candidates, exclude the last dimension from max operation
+    num_classes = prediction.shape[2] - (5 + 1)
+    pred_candidates = torch.logical_and(prediction[..., 4] > conf_thres, torch.max(prediction[..., 5:-(1*num_classes)], axis=-1)[0] > conf_thres)  # candidates, exclude the last dimension from max operation
 
     assert 0 <= conf_thres <= 1, f'conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided.'
     assert 0 <= iou_thres <= 1, f'iou_thres must be in 0.0 to 1.0, however {iou_thres} is provided.'
@@ -44,18 +44,23 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     tik = time.time()
     output = [torch.zeros((0, 7), device=prediction.device)] * prediction.shape[0]
     for img_idx, x in enumerate(prediction): 
-        x = x[pred_candidates[img_idx]] 
+        x = x[pred_candidates[img_idx]]
 
         if not x.shape[0]:
             continue
 
-        x[:, 5:-1] *= x[:, 4:5]
+        x[:, 5:-(1*num_classes)] *= x[:, 4:5]
 
         box = xywh2xyxy(x[:, :4])
 
         if multi_label:
-            box_idx, class_idx = (x[:, 5:-1] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[box_idx], x[box_idx, class_idx + 5, None], class_idx[:, None].float(), x[box_idx, -1:, None]), 1)
+            box_idx, class_idx = (x[:, 5:-(1*num_classes)] > conf_thres).nonzero(as_tuple=False).T
+
+            a = box[box_idx]
+            b = x[box_idx, class_idx + 5, None]
+            c = class_idx[:, None].float()
+            d = x[box_idx, -(1*num_classes):]
+            x = torch.cat((a, b, c, d), 1)
         else: 
             conf, class_idx = x[:, 5:-1].max(1, keepdim=True)
             x = torch.cat((box, conf, class_idx.float(), x[:, -1:]), 1)[conf.view(-1) > conf_thres]

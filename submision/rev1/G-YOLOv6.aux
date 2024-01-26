@@ -1,0 +1,87 @@
+\relax 
+\citation{redmon2016you}
+\citation{li2023yolov6,li2022yolov6}
+\@writefile{toc}{\contentsline {title}{Gated Scene-Specific YOLO: A Pruning and Gating Approach for Efficient Object Detection}{1}{}\protected@file@percent }
+\@writefile{toc}{\authcount {2}}
+\@writefile{toc}{\contentsline {author}{Hector Acosta \and Soon Ki Jung}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{}\protected@file@percent }
+\citation{kaiser2018discrete}
+\citation{chen2019you}
+\citation{bengio2013deep,chen2019you}
+\citation{bengio2013deep}
+\citation{liu2020dynamic}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{}\protected@file@percent }
+\citation{chen2019you}
+\citation{zhang2023neural}
+\citation{hu2018squeeze}
+\citation{he2016deep}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Gater Network}{3}{}\protected@file@percent }
+\citation{he2016deep}
+\newlabel{eq:gated_features}{{1}{4}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces This diagram depicts the transformation of an input image data through our GaterNet pipeline. It includes our feature extractor, which output dimensionality is reduced and standardized by the adaptive pooling, to subsequently be flattened for our fully connected layers culminating in the Improved SemHash layer that renders the output differentiable.}}{4}{}\protected@file@percent }
+\newlabel{fig:feature_extractor}{{1}{4}}
+\@writefile{toc}{\contentsline {subsubsection}{Feature Extraction.}{4}{}\protected@file@percent }
+\citation{he2016deep}
+\citation{chen2019you}
+\citation{kaiser2018discrete}
+\citation{chen2019you}
+\newlabel{eq:feature_flatten}{{2}{5}}
+\newlabel{eq:f0}{{3}{5}}
+\newlabel{eq:g0}{{4}{5}}
+\@writefile{toc}{\contentsline {paragraph}{Improved Semantic Hashing.}{5}{}\protected@file@percent }
+\newlabel{eq:g_noisy}{{5}{5}}
+\newlabel{eq:g_alpha}{{6}{5}}
+\citation{kaiser2015neural}
+\citation{li2023yolov6,li2022yolov6}
+\citation{li2023yolov6,li2022yolov6}
+\newlabel{eq:g_beta}{{7}{6}}
+\newlabel{eq:total_loss}{{8}{6}}
+\newlabel{eq:gate_loss}{{9}{6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}YOLO Architecture}{6}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Architecture diagram featuring GaterNet-augmented YOLOv6. Gating mechanisms are applied post-backbone layers and post-convolutions within the 'Rep-Pan' neck, enabling dynamic feature selection. The network terminates in gated heads for final detection tasks.}}{7}{}\protected@file@percent }
+\newlabel{fig:yolo_architecture}{{2}{7}}
+\@writefile{toc}{\contentsline {subsubsection}{YOLO Gate module.}{7}{}\protected@file@percent }
+\newlabel{eq:G_vector}{{10}{7}}
+\newlabel{eq:g_closed}{{11}{7}}
+\newlabel{eq:conditional_gating}{{12}{8}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces This depicts the conditional modulation of the "Input" tensor by "Gates" following convolution, either allowing a gated output or bypassing the operation to produce a zeroed tensor for the next layer.}}{8}{}\protected@file@percent }
+\newlabel{fig:gating_mechanism}{{3}{8}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Analysis Step}{8}{}\protected@file@percent }
+\citation{snyder2019streets}
+\citation{li2023yolov6,li2022yolov6}
+\citation{he2016deep}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces The graph displays a simplified distribution of gating states across different sections of the network, grouped for clarity. It underscores filters that are persistently active ("Always On"), suppressed ("Completely Off"), or sections that are completely deactivated ("Blocked").}}{9}{}\protected@file@percent }
+\newlabel{fig:gating_analysis}{{4}{9}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Dataset}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Experiment Configuration}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Classification Performance}{10}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Classification performance of various YOLOv6 configurations with and without gating mechanisms.}}{10}{}\protected@file@percent }
+\newlabel{table:classification_performance}{{1}{10}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Comparative Analysis of Gate Behavior Across Scene Variations}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{10}{}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{10}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Scene 1: An intersection with a broader spectrum of car sizes.}}{11}{}\protected@file@percent }
+\newlabel{fig:scene1}{{5}{11}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Scene 2: An overpass highway camera focused on larger vehicles given its location.}}{11}{}\protected@file@percent }
+\newlabel{fig:scene2}{{6}{11}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Comparative graph showing gate activation across different scenes. This visualization underscores how specific channels are influenced by scene characteristics, reflecting the dynamic nature of gate behavior.}}{11}{}\protected@file@percent }
+\newlabel{fig:comparative_analysis}{{7}{11}}
+\bibstyle{splncs04}
+\bibdata{refs.bib}
+\bibcite{bengio2013deep}{1}
+\bibcite{chen2019you}{2}
+\bibcite{he2016deep}{3}
+\bibcite{hu2018squeeze}{4}
+\bibcite{kaiser2018discrete}{5}
+\bibcite{kaiser2015neural}{6}
+\bibcite{li2023yolov6}{7}
+\bibcite{li2022yolov6}{8}
+\bibcite{liu2020dynamic}{9}
+\bibcite{redmon2016you}{10}
+\bibcite{snyder2019streets}{11}
+\bibcite{zhang2023neural}{12}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{12}{}\protected@file@percent }
+\newlabel{sec:conclusion}{{6}{12}}
+\gdef \@abspage@last{12}

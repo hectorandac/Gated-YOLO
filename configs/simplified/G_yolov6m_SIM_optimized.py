@@ -1,18 +1,18 @@
 # YOLOv6m model
 model = dict(
     type='YOLOv6m',
-    pretrained='weights/yolov6m.pt',
+    pretrained='runs/train/Control-YOLOv6M-RAW/weights/best_ckpt.pt',
     depth_multiple=0.60,
     width_multiple=0.75,
     backbone=dict(
-        type='GatedCSPBepBackbone',
+        type='CSPBepBackbone',
         num_repeats=[1, 6, 12, 18, 6],
         out_channels=[64, 128, 256, 512, 1024],
         csp_e=float(2)/3,
         fuse_P2=True,
         ),
     neck=dict(
-        type='GatedCSPRepBiFPANNeck',
+        type='CSPRepBiFPANNeck',
         num_repeats=[12, 12, 12, 12],
         out_channels=[256, 128, 128, 256, 256, 512],
         csp_e=float(2)/3,

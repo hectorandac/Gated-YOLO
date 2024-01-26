@@ -121,3 +121,8 @@ venv.bak/
 dev_tools/
 
 *.whl
+
+data/images/videoplayback.mp4
+data_object_label_2.zip
+gate_proportions.csv
+gating_analysis.png
