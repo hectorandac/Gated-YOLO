@@ -3,6 +3,10 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{svg}
+\usepackage{makecell}
+\usepackage{multirow}
+
 %
 %
 \begin{document}
@@ -17,7 +21,7 @@ Soon Ki Jung\inst{1}\orcidID{0000-0003-0239-6785}}
 \maketitle              % typeset the header of the contribution
 %
 \begin{abstract}
-In object detection, YOLO (You Only Look Once) has significantly advanced real-time applications. However, in dynamic environments, particularly on edge devices like security cameras, optimization is crucial. Our work introduces "Gated Scene-Specific YOLO," an adaptation of YOLO that includes a dynamic gating mechanism for improved efficiency. Traditional YOLO models often process excessive, irrelevant data. Our approach counters this by activating neural pathways relevant to the scene. This is achieved through dynamic gate generation during training and analyzing scenes to deactivate consistently inactive gates, streamlining the model for the environment's specific needs. This method reduces computational load while maintaining or improving detection accuracy, suitable for resource-constrained devices. Our results show that Gated Scene-Specific YOLO improves processing speed and maintains high accuracy, demonstrating the potential to enhance real-time object detection in various settings. This research contributes by showing a practical approach to optimize deep learning models for specific contexts, leading to more adaptable, resource-efficient detection solutions.
+In object detection, YOLO (You Only Look Once) has significantly advanced real-time applications. However, in dynamic environments, particularly on edge devices like security cameras, optimization is crucial. Our work introduces "Gated Scene-Specific YOLO", an adaptation of YOLO that includes a dynamic gating mechanism for improved efficiency. Traditional YOLO models often process excessive, irrelevant data. Our approach counters this by activating neural pathways relevant to the scene. This is achieved through dynamic gate generation during training and analyzing scenes to deactivate consistently inactive gates, streamlining the model for the environment's specific needs. This method reduces computational load while having a minimal impact on detection accuracy, suitable for resource-constrained devices. Our results show that Gated Scene-Specific YOLO improves processing speed and maintains high accuracy, demonstrating the potential to enhance real-time object detection in various settings. This research contributes by showing a practical approach to optimize deep learning models for specific contexts, leading to more adaptable, resource-efficient detection solutions.
 %
 \keywords{Object Detection\and YOLO Architecture\and Scene-Specific Optimization\and Gated Neural Networks\and Model Pruning}
 \end{abstract}
@@ -42,10 +46,14 @@ In parallel, "Neural Network Pruning by Gradient Descent" by Zhang et al.~\cite{
 
 Furthermore, recent research has broadened the scope of conditional computation beyond gating mechanisms. Techniques such as adaptive dropout rate adjustments and tree-structured neural networks demonstrate novel ways of input-dependent computation. Additionally, methods like SE-Net by Hu et al.~\cite{hu2018squeeze}, which dynamically scale components of the network, offer new insights into real-time efficiency optimization.
 
+Moreover, the development of efficient object detection models for resource-constrained environments has been exemplified by approaches like MobileNet YOLO. Introduced by Howard et al.~\cite{howard2019searching}, MobileNet employs depth-wise separable convolutions to construct lightweight neural networks, offering a significant reduction in computational requirements without substantial loss in performance. The integration of MobileNet with the YOLO (You Only Look Once) framework, as in MobileNet YOLO, further demonstrates the feasibility of real-time object detection in embedded systems. These models have set benchmarks in achieving high efficiency, making them particularly suitable for applications in mobile and embedded devices.
+
+Recently, advancements in applying neural networks to challenging conditions have been made, as seen in the ICRA2023 paper 'GDIP: Object-Detection in Adverse Weather Conditions Using Gated Differentiable Image Processing' by Kalwar et al.~\cite{kalwar2023gdip}. This work addresses object detection under adverse weather conditions using a novel gated image processing technique. While focusing on a different aspect of gating mechanisms, it presents an interesting parallel to our approach. Future work could involve comparing these methodologies to explore their respective strengths and limitations in various environmental contexts.
+
 Extending beyond these methods, our approach uniquely capitalizes on the dynamic analysis of neural pathways to establish a static gating mechanism for inference. This strategy not only aligns with the objectives of dynamic filter selection and pruning but also innovates by solidifying the gate configurations post-training. This results in significantly reduced computational demands during inference, particularly beneficial in consistent environmental contexts, setting our method apart in the realm of efficient, real-time object detection.
 %
 \section{Methodology}
-In this section, we outline the "Gated Scene-Specific YOLO" model, comprising the Gater Network, YOLO architecture modifications, and scene-specific analysis. These elements collectively boost efficiency and accuracy in resource-constrained settings. The Gater Network adjusts dynamically to scene features, the YOLO architecture integrates these adjustments, and the analysis process fine-tunes the model for particular environments.
+In this section, we outline the "Gated Scene-Specific YOLO" model, comprising the Gater Network, YOLO architecture modifications, and scene-specific analysis. These elements collectively boost efficiency in resource-constrained settings. The Gater Network adjusts dynamically to scene features, the YOLO architecture integrates these adjustments, and the analysis process fine-tunes the model for particular environments.
 
 \subsection{Gater Network}
 The GaterNet's initial task is to process the input image for feature extraction. Utilizing ResNet-18 by He et al. ~\cite{he2016deep}, known for its shallow yet efficient architecture, we extract key features while maintaining a balance between representational quality and computational speed.
@@ -63,7 +71,7 @@ The gating function \( F_{\text{gate}} \) is defined as \( F_{\text{gate}}: \mat
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\linewidth]{./Images/feature_extractor.png}
+    \includesvg[width=\textwidth]{./Images/feature_extractor}
     \caption{This diagram depicts the transformation of an input image data through our GaterNet pipeline. It includes our feature extractor, which output dimensionality is reduced and standardized by the adaptive pooling, to subsequently be flattened for our fully connected layers culminating in the Improved SemHash layer that renders the output differentiable.}
     \label{fig:feature_extractor}
     \end{figure}
@@ -117,16 +125,20 @@ Here, \( c \) is a scaling factor, which is the size of the gating vector \( g \
 
 \subsection{YOLO Architecture}
 
-The YOLO architecture serves as the secondary principal module of our model. We have selected YOLOv6, as proposed by Li et al.~\cite{li2023yolov6,li2022yolov6}, for its demonstrated real-time performance capabilities and efficient utilization of hardware resources. To this established framework, we introduce a bespoke modification: the integration of GaterNet. As previously stated, this auxiliary network is specifically designed to supply adaptive gating mechanisms, enabling dynamic feature selection and computational efficiency tailored to the task at hand. The Fig. ~\ref{fig:yolo_architecture} demonstrates an overview of our modified YOLO architecture.
+In our model, the YOLO architecture, particularly YOLOv6 as proposed by Li et al.~\cite{li2023yolov6,li2022yolov6}, forms the secondary principal module. YOLOv6 is chosen for its real-time performance and effective use of hardware resources. Our significant contribution to this framework is the incorporation of GaterNet. This auxiliary network, specifically designed for adaptive gating mechanisms, allows for dynamic feature selection, thereby enhancing computational efficiency. Figure ~\ref{fig:yolo_architecture} illustrates our modified YOLO architecture.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{./Images/yolov6_architecture.png}
-\caption{Architecture diagram featuring GaterNet-augmented YOLOv6. Gating mechanisms are applied post-backbone layers and post-convolutions within the 'Rep-Pan' neck, enabling dynamic feature selection. The network terminates in gated heads for final detection tasks.}
+\includesvg[width=\textwidth]{./Images/yolov6_architecture}
+\caption{The diagram showcases our YOLOv6 architecture augmented with GaterNet. It includes a 'Gated Efficient Re-parameterizable Backbone (EfficientRep)', a 'Gated Rep-Pan Neck', and 'Gated Efficient Decoupled Heads'. Each section is purpose-built to optimize performance and efficiency.}
 \label{fig:yolo_architecture}
 \end{figure}
 
-Our gates are applied to most stages of our network. In the Backbone, responsible for initial feature extraction, gating helps in selectively emphasizing salient features and suppressing redundant ones, thereby enhancing the efficiency of subsequent layers. Within the Neck, which integrates and refines these features, gating further enables dynamic resolution and scale adjustment, optimizing the flow of information critical for object recognition. Finally, at the Head, where final detection tasks are executed, gating ensures that only the most pertinent features contribute to the decision-making process, improving the precision of the network's output and reducing computational overhead.
+The 'Gated Efficient Reparameterizable Backbone', also known as EfficientRep, is where the initial and crucial process of feature extraction occurs. The gates within this backbone are responsible for selecting and emphasizing valuable features while suppressing unnecessary ones, thus setting the stage for enhanced processing in subsequent layers.
+
+In the 'Gated Rep-Pan Neck', inspired by the traditional PAN topology and enhanced with Rep blocks, gates play a critical role. They adjust resolution and scale dynamically, ensuring that the flow and integration of features from the backbone to the detection heads are optimized. This section is crucial for refining and aggregating features for accurate object detection.
+
+In the 'Gated Efficient Decoupled Heads' of our YOLOv6 architecture, gates play a crucial role in enhancing detection efficiency. These heads, drawing inspiration from the original YOLOv6 model, are designed with a hybrid-channel strategy, which reduces the number of convolutional layers. The gates within these heads dynamically filter and prioritize features, focusing computational resources on the most relevant elements for accurate object detection. This selective processing significantly cuts down on unnecessary computations, thereby reducing inference latency.
 
 \subsubsection{YOLO Gate module.} The Gate Module significantly augments the YOLO architecture, adapting its behavior for training and inference. During training, it modulates the network’s output via element-wise multiplication based on GaterNet's signals, either preserving or attenuating layer outputs. During inference, it evaluates active gates' proportion, bypassing or permitting convolutional operations accordingly. This dual functionality optimizes feature propagation, tailoring network performance to specific operational needs.
 
@@ -150,7 +162,7 @@ In our gate module, the vector \(\mathbf{G}\) represents the array of gating dec
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\linewidth]{./Images/gated_convolution.png}
+\includesvg[width=\textwidth]{./Images/gated_convolution}
 \caption{This depicts the conditional modulation of the "Input" tensor by "Gates" following convolution, either allowing a gated output or bypassing the operation to produce a zeroed tensor for the next layer.}
 \label{fig:gating_mechanism}
 \end{figure}
@@ -161,8 +173,8 @@ The final component of our methodology is the analytical task. In this phase, we
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{./Images/fixed_grouping_gating_analysis.png}
-\caption{The graph displays a simplified distribution of gating states across different sections of the network, grouped for clarity. It underscores filters that are persistently active ("Always On"), suppressed ("Completely Off"), or sections that are completely deactivated ("Blocked").}
+\includesvg[width=\textwidth]{./Images/fixed_grouping_gating_analysis}
+\caption{The graph displays a simplified distribution of gating states across different sections of the network, grouped for clarity. It underscores filters that are persistently active ("Always On"), suppressed ("Always Off"), or sections that are completely deactivated ("Blocked Layer").}
 \label{fig:gating_analysis}
 \end{figure}
 
@@ -175,28 +187,36 @@ Our experiments focused on object representation in stationary environments like
 \subsection{Experiment Configuration}
 In our experiments, we employed YOLOv6 as the base model for its performance and hardware efficiency. We enhanced it with GaterNet, utilizing ResNet~\cite{he2016deep} for dynamic feature analysis. While other lightweight CNNs could replace ResNet, we preferred ResNet18 for its balance of power and simplicity. We used the STREETS dataset, annotated using YOLOv6 Large, to match our fixed scene research focus. Conducted on an RTX 2080 Super with 8GB RAM, our setup ensured robust computational capacity. Additionally, we pre-trained our model without gating to refine the weights, preparing for more effective gating integration later.
 
+Furthermore, to validate the real-world applicability of our model, especially in embedded and resource-constrained environments, we deployed our enhanced YOLOv6 with GaterNet on the NVIDIA Jetson TX2 edge device. This deployment aimed to measure the model's efficiency in milliseconds per detection, a crucial metric for real-time applications in such environments. The results from the Jetson TX2 provide valuable insights into our model's performance outside of high-end computational settings, demonstrating its versatility and adaptability to different hardware configurations.
+
 \subsection{Classification Performance}
-The classification performance of our model was assessed using the following metrics: Floating Point Operations Per Second (FLOPs), Frames Per Second (FPS), and Mean Average Precision (mAP) at different IoU thresholds. The performance of various configurations of the YOLOv6 model with and without gating mechanisms is summarized in the table below.
+The classification performance of our model was assessed using a comprehensive set of metrics including FLOPs, FPS, mAP at different IoU thresholds, and critically, inference time in milliseconds (ms) on the NVIDIA Jetson TX2. This addition underscores our commitment to evaluating performance in real-world, resource-constrained environments. We examined various variants of the YOLOv6 model: N (Nano), S (Small), M (Medium), and L (Large), both with and without gating mechanisms. The inclusion of inference times, particularly on an edge device like the Jetson TX2, provides insights into the practical deployment capabilities of our model. The summarized performance data is represented at Table~\ref{table:classification_performance}.
+
+In a comparative analysis, the performance of our YOLOv6 N model was juxtaposed with that of the MobileNet YOLOv3 implementation, referenced from Liu in~\cite{liu2018mobilenet}, to evaluate efficiency in practical, resource-constrained scenarios. Both models were tested under similar conditions, using an image resolution of 352 pixels. Our YOLOv6 N model achieved a notably faster inference time of 32ms compared to the 55ms of MobileNet YOLOv3, while also demonstrating superior accuracy, with a mAP@0.50 of 0.8341 against MobileNet YOLOv3's 0.7144. This comparison underscores the effectiveness of our approach in delivering high efficiency without compromising on detection accuracy, marking a significant stride in real-time object detection for embedded systems.
 
 \begin{table}[ht]
-\centering
-\begin{tabular}{lcccccc}
-\hline
-\textbf{Model} & \textbf{Input Size} & \textbf{Gates} & \textbf{FLOPs} & \textbf{FPS} & \textbf{mAP@0.50} & \textbf{mAP@0.50:0.95} \\
-\hline
-YOLOv6-N & 640 & - & 3.38G & 188.42 & 0.9341 & 0.793 \\
-YOLOv6-S & 640 & - & 13.46G & 176.37 & 0.945 & 0.8361 \\
-YOLOv6-M & 640 & - & 25.48G & 101.10 & 0.9353 & 0.8249 \\
-YOLOv6-L & 640 & - & 44.77G & 64.72 & 0.9469 & 0.8579 \\
-YOLOv6-N & 640 & 5,632 & 1.54G & 218.48 & 0.9057 & 0.7351 \\
-YOLOv6-S & 640 & 11,248 & 7.65G & 211.85 & 0.916 & 0.7712 \\
-YOLOv6-M & 640 & 21,344 & 13.23G & 173.27 & 0.9159 & 0.783 \\
-YOLOv6-L & 640 & 31,760 & 23.65G & 129.96 & 0.9186 & 0.7878 \\
-\hline
-\end{tabular}
-\caption{Classification performance of various YOLOv6 configurations with and without gating mechanisms.}
-\label{table:classification_performance}
-\end{table}
+    \centering
+    \begin{tabular}{lrrrrrrr}
+    \hline
+    \textbf{Model} & \textbf{Size} & \textbf{Gates} & \textbf{FLOPs} & \makecell{\textbf{FPS} \\ \textbf{(RTX 2080)}} & \makecell{\textbf{mAP} \\ \textbf{0.50}} & \makecell{\textbf{mAP} \\ \textbf{0.50:0.95}} & \makecell{\textbf{Inference Time} \\ \textbf{(TX2)}} \\
+    \hline
+    \multirow{2}{*}{YOLOv6-N} & \multirow{2}{*}{640} & - & 3.38G & 188.42 & 0.9341 & 0.7930 & 85ms \\
+     & & 5,632 & 1.54G & 218.48 & 0.9057 & 0.7351 & 32ms \\
+    \hline
+    \multirow{2}{*}{YOLOv6-S} & \multirow{2}{*}{640} & - & 13.46G & 176.37 & 0.9450 & 0.8361 & 137ms \\
+     & & 11,248 & 7.65G & 211.85 & 0.916 & 0.7712 & 44ms \\
+    \hline
+    \multirow{2}{*}{YOLOv6-M} & \multirow{2}{*}{640} & - & 25.48G & 101.10 & 0.9353 & 0.8249 & 222ms \\
+     & & 21,344 & 13.23G & 173.27 & 0.9159 & 0.7830 & 93ms \\
+    \hline
+    \multirow{2}{*}{YOLOv6-L} & \multirow{2}{*}{640} & - & 44.77G & 64.72 & 0.9469 & 0.8579 & 321ms \\
+     & & 31,760 & 23.65G & 129.96 & 0.9186 & 0.7878 & 126ms \\
+    \hline
+    \end{tabular}
+    \caption{Classification performance of various YOLOv6 configurations with and without gating mechanisms.}
+    \label{table:classification_performance}
+    \end{table}
+    
 
 \subsection{Comparative Analysis of Gate Behavior Across Scene Variations}
 
@@ -222,7 +242,7 @@ The visual comparison in Figures~\ref{fig:scene1} and~\ref{fig:scene2} illustrat
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\linewidth]{./Images/vari-viod.png}
+\includegraphics[width=\linewidth]{./Images/vari-viod.pdf}
 \caption{Comparative graph showing gate activation across different scenes. This visualization underscores how specific channels are influenced by scene characteristics, reflecting the dynamic nature of gate behavior.}
 \label{fig:comparative_analysis}
 \end{figure}
@@ -231,11 +251,15 @@ The graph in Figure~\ref{fig:comparative_analysis} illustrates the variance in g
 
 \section{Discussion}
 \label{sec:discussion}
-Our study has successfully demonstrated that Gated Scene-Specific YOLO significantly enhances computational efficiency in environments with consistent features, such as stationary surveillance systems and traffic monitoring cameras. By focusing on fixed settings, the model's selective gating mechanism strategically deactivates irrelevant filters, reducing computational overhead. This approach aligns with the growing need for resource-efficient models in embedded systems and edge devices, where consistent environmental conditions prevail. While the model shows less adaptability to new or changing scenes, its performance in familiar settings suggests a substantial reduction in resource consumption without sacrificing accuracy. This characteristic makes it particularly valuable in applications where computational resources are limited, and operational consistency is guaranteed. Future work could focus on refining the gating mechanism to ensure minimal performance degradation over time and exploring similar efficiency-oriented approaches in other fixed-setting applications.
+Our study has successfully demonstrated that Gated Scene-Specific YOLO significantly enhances computational efficiency in environments with consistent features, such as stationary surveillance systems and traffic monitoring cameras. By focusing on fixed settings, the model's selective gating mechanism strategically deactivates irrelevant filters, reducing computational overhead. This approach aligns with the growing need for resource-efficient models in embedded systems and edge devices, where consistent environmental conditions prevail. While the model shows less adaptability to new or changing scenes, its performance in familiar settings suggests a substantial reduction in resource consumption while minimally impacting accuracy. This characteristic makes it particularly valuable in applications where computational resources are limited, and operational consistency is guaranteed. Future work could focus on refining the gating mechanism to ensure minimal performance degradation over time and exploring similar efficiency-oriented approaches in other fixed-setting applications.
 
 \section{Conclusion}
 \label{sec:conclusion}
-In this paper, we introduced the Gated Scene-Specific YOLO, a novel adaptation of the YOLO architecture that incorporates a dynamic gating mechanism to improve efficiency in fixed-setting object detection tasks. Our approach represents a significant stride towards resource-efficient deep learning, particularly for applications operating under consistent environmental conditions. The substantial computational savings achieved, along with the maintained accuracy, underscore the potential of selective gating in enhancing the performance of object detection models. While our model is tailored for fixed settings, its underlying principles may inspire broader research into resource optimization in various deep learning applications. As the demand for intelligent systems in resource-constrained environments grows, approaches like Gated Scene-Specific YOLO will be crucial in paving the way for more sustainable and efficient solutions.
+In this paper, we introduced the Gated Scene-Specific YOLO, a novel adaptation of the YOLO architecture that incorporates a dynamic gating mechanism to improve efficiency in fixed-setting object detection tasks. Our approach represents a significant stride towards resource-efficient deep learning, particularly for applications operating under consistent environmental conditions. The substantial computational savings achieved, underscore the potential of selective gating in enhancing the performance of object detection models. While our model is tailored for fixed settings, its underlying principles may inspire broader research into resource optimization in various deep learning applications. As the demand for intelligent systems in resource-constrained environments grows, approaches like Gated Scene-Specific YOLO will be crucial in paving the way for more sustainable and efficient solutions.
+
+\section{Acknowledgement}
+\label{sec:acknowledgement}
+This work was supported by Innovative Human Resource Development for Local Intellectualization program through the Institute of Information \& Communications Technology Planning \& Evaluation(IITP) grant funded by the Korea government(MSIT)(IITP-2024-RS-2022-00156389) and also was supported by the BK21 FOUR project (AI-driven Convergence Software Education Research Program) funded by the Ministry of Education, School of Computer Science and Engineering, Kyungpook National University, Korea (4199990214394).
 
 \bibliographystyle{splncs04}
 \bibliography{refs.bib}

@@ -35,31 +35,29 @@ class Model(nn.Module):
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
-        if not self.enable_gater_net:
-            x = self.backbone(x)
-            x = self.neck(x)
-            if not export_mode:
-                featmaps = []
-                featmaps.extend(x)
-            x = self.detect(x)
-            if self.training:
-                return (*x, None), None
-            else:
-                return x, None
+        gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
+        x = self.backbone(x, gating_decisions)
+        x = self.neck(x, gating_decisions)
+        if not export_mode:
+            featmaps = []
+            featmaps.extend(x)
+        if self.training:
+            x = self.detect(x, gating_decisions)
+            return x, gating_decisions, featmaps
         else:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
-            x = self.backbone(x, gating_decisions)
-            x = self.neck(x, gating_decisions)
-            if not export_mode:
-                featmaps = []
-                featmaps.extend(x)
-            if self.training:
-                x, cls_score_list, reg_distri_list = self.detect(x, gating_decisions)
-                return (x, cls_score_list, reg_distri_list, gating_decisions), gating_decisions
-            else:
-                x = self.detect(x, gating_decisions)
-                return x, gating_decisions
-    
+            x = self.detect(x, gating_decisions)
+            return x, gating_decisions
+            
+    #def forward(self, x):
+    #    export_mode = torch.onnx.is_in_onnx_export()
+    #    x = self.backbone(x)
+    #    x = self.neck(x)
+    #    if export_mode == False:
+    #        featmaps = []
+    #        featmaps.extend(x)
+    #    x = self.detect(x)
+    #    return x if export_mode is True else [x, featmaps]
+
     def prune_regions(self, x, source_mask, path):
         CounterA.reset()
         if not self.enable_gater_net:

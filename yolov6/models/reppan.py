@@ -796,7 +796,7 @@ class CSPRepPANNeck(nn.Module):
         return outputs
 
 
-class CSPRepBiFPANNeck1(nn.Module):
+class CSPRepBiFPANNeck(nn.Module):
     """
     CSPRepBiFPANNeck module.
     """
@@ -901,26 +901,17 @@ class CSPRepBiFPANNeck1(nn.Module):
         f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
         f_out0 = self.Rep_p4(f_concat_layer0)
 
-        if self.inference_with_mask and self.masks[0] is None:
-            pan_out2 = torch.zeros_like(x2)
-        else:
-            fpn_out1 = self.reduce_layer1(f_out0)
-            f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-            pan_out2 = self.Rep_p3(f_concat_layer1)
+        fpn_out1 = self.reduce_layer1(f_out0)
+        f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
+        pan_out2 = self.Rep_p3(f_concat_layer1)
 
-        if self.inference_with_mask and self.masks[1] is None:
-            pan_out1 = torch.zeros_like(x1)
-        else:
-            down_feat1 = self.downsample2(pan_out2)
-            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-            pan_out1 = self.Rep_n3(p_concat_layer1)
+        down_feat1 = self.downsample2(pan_out2)
+        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+        pan_out1 = self.Rep_n3(p_concat_layer1)
 
-        if self.inference_with_mask and self.masks[2] is None:
-            pan_out0 = torch.zeros_like(x2)
-        else:
-            down_feat0 = self.downsample1(pan_out1)
-            p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-            pan_out0 = self.Rep_n4(p_concat_layer2)
+        down_feat0 = self.downsample1(pan_out1)
+        p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
+        pan_out0 = self.Rep_n4(p_concat_layer2)
 
         outputs = [pan_out2, pan_out1, pan_out0]
 
@@ -1080,7 +1071,7 @@ class GatedCSPRepBiFPANNeck(nn.Module):
 
         return outputs
 
-class CSPRepBiFPANNeck(nn.Module):
+class CSPRepBiFPANNeck0(nn.Module):
     """
     GatedCSPRepBiFPANNeck module.
     """

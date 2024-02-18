@@ -19,7 +19,7 @@ from yolov6.data.data_augment import letterbox
 from yolov6.data.datasets import LoadData
 from yolov6.utils.nms import non_max_suppression
 
-from fvcore.nn import FlopCountAnalysis
+# from fvcore.nn import FlopCountAnalysis
 
 from scipy.ndimage import label, binary_dilation, sum as ndi_sum
 from PIL import Image
@@ -114,14 +114,14 @@ class Inferer:
         if enable_gater_net and enable_fixed_gates:
             self.model.model.gater.fixed_gates = torch.load(fixed_gates)
         
-        self.model.model.neck.enable_gater_net = enable_gater_net
-        self.model.model.neck.enable_fixed_gates = enable_fixed_gates
+        #self.model.model.neck.enable_gater_net = enable_gater_net
+        #self.model.model.neck.enable_fixed_gates = enable_fixed_gates
         
-        self.model.model.backbone.enable_gater_net = enable_gater_net
-        self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
+        #self.model.model.backbone.enable_gater_net = enable_gater_net
+        #self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
 
-        self.model.model.gater.enable_gater_net = enable_gater_net
-        self.model.model.gater.enable_fixed_gates = enable_fixed_gates
+        #self.model.model.gater.enable_gater_net = enable_gater_net
+        #self.model.model.gater.enable_fixed_gates = enable_fixed_gates
         
         vid_path, vid_writer, windows = None, None, []
         fps_calculator = CalcFPS()
@@ -140,10 +140,10 @@ class Inferer:
                 img = img[None]
                 # expand for batch dim
             t1 = time.time()
-            #pred_results, gating_decision = self.model(img)
-            CounterA.reset()
-            flops = FlopCountAnalysis(self.model, img)
-            print(f"Total FLOPS: {flops.total()}")
+            pred_results, gating_decision = self.model(img)
+            #CounterA.reset()
+            #lops = FlopCountAnalysis(self.model, img)
+            #print(f"Total FLOPS: {flops.total()}")
             det = non_max_suppression(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
             t2 = time.time()
 
@@ -177,20 +177,18 @@ class Inferer:
 
             if len(det):
                 det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
-                # print(det[0])
-                for *xyxy, conf, cls, head_index in reversed(det):
+                for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf, head_index)
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                    if save_img:
-                        class_num = int(cls) & 8  # integer class
-                        head_index_num = int(head_index)
-                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f} {head_index_num}')
+                    if save_img or view_img:
+                        class_num = int(cls)  # integer class
+                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
 
-                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(head_index_num, True))
+                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(class_num, True))
 
                 img_src = np.asarray(img_ori)
 

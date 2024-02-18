@@ -84,8 +84,8 @@ class Detect1(nn.Module):
                 cls_x = x[i]
                 reg_x = x[i]
                 cls_feat = self.cls_convs[i](cls_x)
-                reg_feat = self.reg_convs[i](reg_x)
                 cls_output = self.cls_preds[i](cls_feat)
+                reg_feat = self.reg_convs[i](reg_x)
                 reg_output = self.reg_preds[i](reg_feat)
 
                 cls_output = torch.sigmoid(cls_output)
@@ -97,21 +97,20 @@ class Detect1(nn.Module):
 
             return x, cls_score_list, reg_distri_list
         else:
-            device = x[0].device
             cls_score_list = []
             reg_dist_list = []
-            head_index_list = []
+            anchor_points, stride_tensor = generate_anchors(
+                x, self.stride, self.grid_cell_size, self.grid_cell_offset, device=x[0].device, is_eval=True, mode='af')
 
             for i in range(self.nl):
                 b, _, h, w = x[i].shape
                 l = h * w
-
                 x[i] = self.stems[i](x[i])
                 cls_x = x[i]
                 reg_x = x[i]
                 cls_feat = self.cls_convs[i](cls_x)
-                reg_feat = self.reg_convs[i](reg_x)
                 cls_output = self.cls_preds[i](cls_feat)
+                reg_feat = self.reg_convs[i](reg_x)
                 reg_output = self.reg_preds[i](reg_feat)
 
                 if self.use_dfl:
@@ -119,32 +118,31 @@ class Detect1(nn.Module):
                     reg_output = self.proj_conv(F.softmax(reg_output, dim=1))
 
                 cls_output = torch.sigmoid(cls_output)
+                cls_score_list.append(cls_output.reshape([b, self.nc, l]))
+                reg_dist_list.append(reg_output.reshape([b, 4, l]))
 
-                if self.export:
-                    cls_score_list.append(cls_output)
-                    reg_dist_list.append(reg_output)
-                else:
-                    head_index_list.append(torch.full((b, self.nc, l), i, device=device))
-                    cls_score_list.append(cls_output.reshape([b, self.nc, l]))
-                    reg_dist_list.append(reg_output.reshape([b, 4, l]))
-
-            if self.export:
-                return tuple(torch.cat([cls, reg], 1) for cls, reg in zip(cls_score_list, reg_dist_list))
-
-            head_index_list = torch.cat(head_index_list, axis=-1).permute(0, 2, 1)
             cls_score_list = torch.cat(cls_score_list, axis=-1).permute(0, 2, 1)
             reg_dist_list = torch.cat(reg_dist_list, axis=-1).permute(0, 2, 1)
 
 
-            anchor_points, stride_tensor = generate_anchors(
-                x, self.stride, self.grid_cell_size, self.grid_cell_offset, device=x[0].device, is_eval=True, mode='af')
-
             pred_bboxes = dist2bbox(reg_dist_list, anchor_points, box_format='xywh')
             pred_bboxes *= stride_tensor
 
+            #max_scores, _ = torch.max(cls_score_list, dim=1)
+            #min_scores, _ = torch.min(cls_score_list, dim=1)
+            #mean_scores = torch.mean(cls_score_list, dim=1)
+
+            # Print statistics for each class
+            #for i in range(max_scores.shape[-1]):  # Loop through each class
+                #print(f"Class {i}: Max score = {max_scores[0, i]}, Min score = {min_scores[0, i]}, Mean score = {mean_scores[0, i]}")
+
             return torch.cat(
-                [pred_bboxes, torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype), cls_score_list, head_index_list],axis=-1
-                )
+                [
+                    pred_bboxes,
+                    torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype),
+                    cls_score_list
+                ],
+                axis=-1)
 
 class Detect(nn.Module):
     export = False
@@ -240,14 +238,12 @@ class Detect(nn.Module):
             device = x[0].device
             cls_score_list = []
             reg_dist_list = []
-            head_index_list = []
 
             for i in range(self.nl):
                 b, _, h, w = x[i].shape
                 l = h * w
 
-                if self.inference_with_mask and self.masks[i] is None or (gating_decisions is not None and gating_decisions[-self.nl + i] is None):
-                    head_index_list.append(torch.full((b, self.nc, l), i, device=device))
+                if gating_decisions is not None and gating_decisions[-self.nl + i] is None:
                     cls_score_list.append(torch.zeros([b, self.nc, l], device=device))
                     reg_dist_list.append(torch.zeros([b, 4, l], device=device))
                 else:
@@ -284,14 +280,12 @@ class Detect(nn.Module):
                         cls_score_list.append(cls_output)
                         reg_dist_list.append(reg_output)
                     else:
-                        head_index_list.append(torch.full((b, self.nc, l), i, device=device))
                         cls_score_list.append(cls_output.reshape([b, self.nc, l]))
                         reg_dist_list.append(reg_output.reshape([b, 4, l]))
 
             if self.export:
                 return tuple(torch.cat([cls, reg], 1) for cls, reg in zip(cls_score_list, reg_dist_list))
 
-            head_index_list = torch.cat(head_index_list, axis=-1).permute(0, 2, 1)
             cls_score_list = torch.cat(cls_score_list, axis=-1).permute(0, 2, 1)
             reg_dist_list = torch.cat(reg_dist_list, axis=-1).permute(0, 2, 1)
 
@@ -303,8 +297,11 @@ class Detect(nn.Module):
             pred_bboxes *= stride_tensor
 
             return torch.cat(
-                [pred_bboxes, torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype), cls_score_list, head_index_list],axis=-1
-                )
+                [
+                    pred_bboxes,
+                    torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype), 
+                    cls_score_list
+                ], axis=-1)
 
 
 def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16, num_layers=3):

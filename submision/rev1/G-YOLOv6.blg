@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: G-YOLOv6.aux
 The style file: splncs04.bst
 Database file #1: refs.bib
-You've used 12 entries,
+You've used 15 entries,
             2850 wiz_defined-function locations,
-            655 strings with 6574 characters,
-and the built_in function-call counts, 6836 in all, are:
-= -- 543
-> -- 274
-< -- 6
-+ -- 112
-- -- 100
-* -- 424
-:= -- 921
-add.period$ -- 18
-call.type$ -- 12
-change.case$ -- 95
+            672 strings with 7294 characters,
+and the built_in function-call counts, 8995 in all, are:
+= -- 722
+> -- 370
+< -- 8
++ -- 151
+- -- 136
+* -- 562
+:= -- 1199
+add.period$ -- 24
+call.type$ -- 15
+change.case$ -- 125
 chr.to.int$ -- 0
-cite$ -- 12
-duplicate$ -- 598
-empty$ -- 586
-format.name$ -- 111
-if$ -- 1458
+cite$ -- 15
+duplicate$ -- 766
+empty$ -- 765
+format.name$ -- 149
+if$ -- 1931
 int.to.chr$ -- 0
-int.to.str$ -- 12
-missing$ -- 128
-newline$ -- 42
-num.names$ -- 24
-pop$ -- 272
+int.to.str$ -- 15
+missing$ -- 164
+newline$ -- 51
+num.names$ -- 30
+pop$ -- 350
 preamble$ -- 1
-purify$ -- 73
+purify$ -- 96
 quote$ -- 0
-skip$ -- 165
+skip$ -- 223
 stack$ -- 0
-substring$ -- 319
-swap$ -- 291
-text.length$ -- 6
+substring$ -- 438
+swap$ -- 388
+text.length$ -- 8
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 48
+type$ -- 60
 warning$ -- 0
-while$ -- 51
-width$ -- 14
-write$ -- 120
+while$ -- 66
+width$ -- 17
+write$ -- 150

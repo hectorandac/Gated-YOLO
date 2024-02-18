@@ -666,7 +666,7 @@ class PermanentGatedCSPBepBackbone(nn.Module):
         fuse_P2=False,
         cspsppf=False,
         stage_block_type="BepC3",
-        gates=torch.load('./runs/inference/exp51/gates.pt')
+        gates=None
     ):
         super().__init__()
 

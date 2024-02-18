@@ -18,6 +18,12 @@ He, K., Zhang, X., Ren, S., Sun, J.: Deep residual learning for image
   recognition. In: Proceedings of the IEEE conference on computer vision and
   pattern recognition. pp. 770--778 (2016)
 
+\bibitem{howard2019searching}
+Howard, A., Sandler, M., Chu, G., Chen, L.C., Chen, B., Tan, M., Wang, W., Zhu,
+  Y., Pang, R., Vasudevan, V., et~al.: Searching for mobilenetv3. In:
+  Proceedings of the IEEE/CVF international conference on computer vision. pp.
+  1314--1324 (2019)
+
 \bibitem{hu2018squeeze}
 Hu, J., Shen, L., Sun, G.: Squeeze-and-excitation networks. In: Proceedings of
   the IEEE conference on computer vision and pattern recognition. pp.
@@ -31,6 +37,12 @@ Kaiser, {\L}., Bengio, S.: Discrete autoencoders for sequence models. arXiv
 Kaiser, {\L}., Sutskever, I.: Neural gpus learn algorithms. arXiv preprint
   arXiv:1511.08228  (2015)
 
+\bibitem{kalwar2023gdip}
+Kalwar, S., Patel, D., Aanegola, A., Konda, K.R., Garg, S., Krishna, K.M.:
+  Gdip: gated differentiable image processing for object detection in adverse
+  conditions. In: 2023 IEEE International Conference on Robotics and Automation
+  (ICRA). pp. 7083--7089. IEEE (2023)
+
 \bibitem{li2023yolov6}
 Li, C., Li, L., Geng, Y., Jiang, H., Cheng, M., Zhang, B., Ke, Z., Xu, X., Chu,
   X.: Yolov6 v3. 0: A full-scale reloading. arXiv preprint arXiv:2301.05586
@@ -40,6 +52,10 @@ Li, C., Li, L., Geng, Y., Jiang, H., Cheng, M., Zhang, B., Ke, Z., Xu, X., Chu,
 Li, C., Li, L., Jiang, H., Weng, K., Geng, Y., Li, L., Ke, Z., Li, Q., Cheng,
   M., Nie, W., et~al.: Yolov6: A single-stage object detection framework for
   industrial applications. arXiv preprint arXiv:2209.02976  (2022)
+
+\bibitem{liu2018mobilenet}
+Liu, E.: Mobilenet-yolo caffe. \url{https://github.com/eric612/MobileNet-YOLO}
+  (2018)
 
 \bibitem{liu2020dynamic}
 Liu, J., Xu, Z., Shi, R., Cheung, R.C., So, H.K.: Dynamic sparse training: Find

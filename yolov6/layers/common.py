@@ -822,7 +822,9 @@ class DetectBackend(nn.Module):
         y, g = self.model(im)
         if isinstance(y, np.ndarray):
             y = torch.tensor(y, device=self.device)
-        return y
+
+        
+        return y, g
 
 
 class RepBlock1(nn.Module):

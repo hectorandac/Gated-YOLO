@@ -167,8 +167,9 @@ class Trainer:
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
-            preds, s_featmaps = self.model(images)
-            self.gates = preds[3]
+            preds, gates, s_featmaps = self.model(images)
+
+            self.gates = gates
             if self.args.distill:
                 with torch.no_grad():
                     t_preds, t_featmaps = self.teacher_model(images)
@@ -185,8 +186,8 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num,
-                                                            batch_height, batch_width, 0.0002) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 0.0002, gates) # YOLOv6_af
+
             if self.rank != -1:
                 total_loss *= self.world_size
         # backward
@@ -310,7 +311,7 @@ class Trainer:
             self.best_ap = self.evaluate_results[1]
             self.best_stop_strong_aug_ap = self.evaluate_results[1]
 
-
+        print(self.data_dict['nc'])
         self.compute_loss = ComputeLoss(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
                                         warmup_epoch=self.cfg.model.head.atss_warmup_epoch,
@@ -444,7 +445,7 @@ class Trainer:
             LOGGER.info(f'Loading state_dict from {weights} for fine-tuning...')
             model = load_state_dict(weights, model, map_location=device)
 
-        # LOGGER.info('Model: {}'.format(model))
+        LOGGER.info('Model: {}'.format(model))
         return model
 
     def get_teacher_model(self, args, cfg, nc, device):

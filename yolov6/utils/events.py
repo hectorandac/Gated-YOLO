@@ -6,7 +6,6 @@ import logging
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import csv
 
