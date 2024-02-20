@@ -33,7 +33,7 @@ class Model(nn.Module):
         # Init weights
         initialize_weights(self)
 
-    def forward(self, x):
+    def forward0(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
         gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
         x = self.backbone(x, gating_decisions)
@@ -48,7 +48,7 @@ class Model(nn.Module):
             x = self.detect(x, gating_decisions)
             return x, gating_decisions, None
             
-    def forward1(self, x):
+    def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export()
         x = self.backbone(x)
         x = self.neck(x)
