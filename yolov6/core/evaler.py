@@ -125,7 +125,7 @@ class Evaler:
 
             # Inference
             t2 = time_sync()
-            outputs, _ = model(imgs)
+            outputs, _, _ = model(imgs)
             self.speed_result[2] += time_sync() - t2  # inference time
 
             # post-process

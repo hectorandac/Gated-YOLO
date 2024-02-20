@@ -796,7 +796,7 @@ class CSPRepPANNeck(nn.Module):
         return outputs
 
 
-class CSPRepBiFPANNeck(nn.Module):
+class CSPRepBiFPANNeck1(nn.Module):
     """
     CSPRepBiFPANNeck module.
     """
@@ -1071,7 +1071,7 @@ class GatedCSPRepBiFPANNeck(nn.Module):
 
         return outputs
 
-class CSPRepBiFPANNeck0(nn.Module):
+class CSPRepBiFPANNeck(nn.Module):
     """
     GatedCSPRepBiFPANNeck module.
     """

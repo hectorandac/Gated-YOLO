@@ -46,17 +46,17 @@ class Model(nn.Module):
             return x, gating_decisions, featmaps
         else:
             x = self.detect(x, gating_decisions)
-            return x, gating_decisions
+            return x, gating_decisions, None
             
-    #def forward(self, x):
-    #    export_mode = torch.onnx.is_in_onnx_export()
-    #    x = self.backbone(x)
-    #    x = self.neck(x)
-    #    if export_mode == False:
-    #        featmaps = []
-    #        featmaps.extend(x)
-    #    x = self.detect(x)
-    #    return x if export_mode is True else [x, featmaps]
+    def forward1(self, x):
+        export_mode = torch.onnx.is_in_onnx_export()
+        x = self.backbone(x)
+        x = self.neck(x)
+        if export_mode == False:
+            featmaps = []
+            featmaps.extend(x)
+        x = self.detect(x)
+        return [x, None] if export_mode is True else [x, None, featmaps]
 
     def prune_regions(self, x, source_mask, path):
         CounterA.reset()
