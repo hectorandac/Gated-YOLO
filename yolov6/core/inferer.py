@@ -188,7 +188,7 @@ class Inferer:
                         class_num = int(cls)  # integer class
                         label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
 
-                        self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(class_num, True))
+                        self.plot_box_and_label(img_ori, 2, xyxy, label, color=self.generate_colors(class_num, True))
 
                 img_src = np.asarray(img_ori)
 
