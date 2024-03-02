@@ -188,8 +188,11 @@ class ComputeLoss:
             gating_loss = g_reconstructed.mean(dim=1).mean()
             divers = self.compute_gating_diversity_loss(g_reconstructed, gt_labels)
             gating_loss = gating_loss * lambda_reg
-            loss += gating_loss + divers
-            loss_components.append((gating_loss + divers).unsqueeze(0))
+            loss += gating_loss
+            loss += divers
+            # print(gating_loss, divers, "##############")
+            loss_components.append(gating_loss.unsqueeze(0))
+            loss_components.append(divers.unsqueeze(0))
 
         return loss, torch.cat(loss_components).detach()
     
