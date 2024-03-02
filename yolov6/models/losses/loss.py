@@ -165,21 +165,10 @@ class ComputeLoss:
         loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
 
-        # Compute gating loss (L1 regularization term)
-        # Compute the gating loss
-        gating_loss = None
-        if gating_decision is not None:
-            gating_decision = torch.cat([gd[0].flatten() for gd in gating_decision])
-            gating_loss = torch.norm(gating_decision, 1) / batch_size
-
         # Compute the total loss with adaptive weights
         loss = self.loss_weight['class'] * loss_cls + \
             self.loss_weight['iou'] * loss_iou + \
             self.loss_weight['dfl'] * loss_dfl
-
-        # Only add gating loss if gating_decission is not None
-        if gating_decision is not None:
-            loss += lambda_reg * gating_loss
 
         # Prepare the loss components for return
         loss_components = [
@@ -188,11 +177,84 @@ class ComputeLoss:
             (self.loss_weight['class'] * loss_cls).unsqueeze(0)
         ]
 
+        # Compute gating loss (L1 regularization term)
+        # Compute the gating loss
+        gating_loss = None
         if gating_decision is not None:
-            loss_components.append((lambda_reg * gating_loss).unsqueeze(0))
+            g_reconstructed = torch.cat([gd[0].flatten(start_dim=1) for gd in gating_decision], dim=1)
+
+            #gating_decision = torch.cat([gd[0].flatten() for gd in gating_decision])
+            #print("$$$$$$$$$$$$$$$$$$", gating_decision.shape)
+            gating_loss = g_reconstructed.mean(dim=1).mean()
+            divers = self.compute_gating_diversity_loss(g_reconstructed, gt_labels)
+            gating_loss = gating_loss * lambda_reg
+            loss += gating_loss + divers
+            loss_components.append((gating_loss + divers).unsqueeze(0))
 
         return loss, torch.cat(loss_components).detach()
     
+    def compute_gating_diversity_loss(self, gating_decision, gt_labels):
+        # Step 1: Compute Class Composition Diversity
+        class_diversity_index = self.compute_class_diversity_index(gt_labels)
+        
+        # Step 2: Compute Gating Decision Diversity
+        gating_diversity_index = self.compute_gating_diversity_index_hamming(gating_decision)
+        num_comparisons = 12 * (12 - 1) #* (12 - 2) # For pairwise comparisons
+        normalized_gating_diversity_index = torch.mean(gating_diversity_index[gating_diversity_index != 0]) / num_comparisons
+        
+        # Step 3: Calculate the Diversity Loss
+        diversity_loss = torch.abs(class_diversity_index - normalized_gating_diversity_index)
+        #print("###########", class_diversity_index, normalized_gating_diversity_index, diversity_loss)
+        
+        return diversity_loss
+    
+    def compute_gating_diversity_index_hamming(self, gating_decision):
+        # Convert boolean gating decisions to float for Hamming distance computation
+        gating_decision_float = gating_decision.float()
+        batch_size = gating_decision_float.size(0)
+        
+        # Initialize a tensor to hold pairwise Hamming distances
+        hamming_distances = torch.zeros((batch_size, batch_size))
+        
+        # Compute pairwise Hamming distances
+        for i in range(batch_size):
+            for j in range(i + 1, batch_size):
+                # Hamming distance is the sum of absolute differences
+                distance = torch.sum(torch.abs(gating_decision_float[i] - gating_decision_float[j]))
+                hamming_distances[i, j] = distance
+                hamming_distances[j, i] = distance  # Symmetric
+        
+        # Average the Hamming distances to get the diversity index
+        diversity_index = torch.mean(hamming_distances[hamming_distances != 0])  # Exclude self-comparisons
+        return diversity_index
+    
+    def compute_class_diversity_index(self, gt_labels):
+        # Filter out unlabeled data (-1 values)
+        labeled_indices = gt_labels >= 0
+        labeled_gt_labels = gt_labels[labeled_indices]
+        
+        # Ensure labeled_gt_labels is an integer tensor suitable for use as indices
+        labeled_gt_labels = labeled_gt_labels.long()
+        
+        # Calculate num_classes excluding unlabeled data
+        num_classes = int(labeled_gt_labels.max().item()) + 1
+        
+        # Convert labeled_gt_labels to one-hot encoding
+        one_hot_labels = F.one_hot(labeled_gt_labels, num_classes=num_classes).to(gt_labels.device)
+        
+        # Calculate the frequency of each class in the batch
+        class_counts = one_hot_labels.sum(dim=0).float()
+        
+        # Calculate Entropy for Class Distribution
+        class_probabilities = class_counts / class_counts.sum()
+        entropy = -torch.sum(class_probabilities * torch.log2(class_probabilities + 1e-9))  # Avoid log(0)
+        
+        # Optional: Introduce a Weighting System for Class Specificity
+        class_weights = torch.ones(num_classes).to(gt_labels.device)  # Placeholder for class-specific weights
+        weighted_entropy = -torch.sum(class_weights * class_probabilities * torch.log2(class_probabilities + 1e-9))
+        
+        return weighted_entropy
+
     def adaptive_weight(self, gating_loss, other_loss, base_weight, scaling_factor):
         if gating_loss < other_loss:
             difference = other_loss - gating_loss

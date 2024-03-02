@@ -180,7 +180,7 @@ class Inferer:
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf, head_index)
+                        line = (cls, *xywh, conf)
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
@@ -298,15 +298,15 @@ class Inferer:
 
 
             
-            annotations = self.parse_yolo_annotations(txt_path + '.txt')
-            heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)
+            # annotations = self.parse_yolo_annotations(txt_path + '.txt')
+            # heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)
             
             img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
             img = img.to(self.device)
             if len(img.shape) == 3:
                 img = img[None]
-            self.model.model.prune_regions(img, heat_maps, save_dir)
-            np.save(save_dir + '/kernel.npy', heat_maps)
+            #self.model.model.prune_regions(img, heat_maps, save_dir)
+            #np.save(save_dir + '/kernel.npy', heat_maps)
 
     def first_and_others(generator):
         iterator = iter(generator)
@@ -323,16 +323,15 @@ class Inferer:
             lines = f.readlines()
 
         for line in lines:
-            cls, x, y, w, h, confidence, layer = line.strip().split()
+            cls, x, y, w, h, confidence = line.strip().split()
             cls = int(cls)
             x = float(x)
             y = float(y)
             w = float(w)
             h = float(h)
-            layer = int(layer)
             confidence = float(confidence)
 
-            annotations[cls].append((x, y, w, h, confidence, layer))
+            annotations[cls].append((x, y, w, h, confidence))
         
         return annotations
 
