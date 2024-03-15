@@ -28,7 +28,7 @@ class GaterNetwork(nn.Module):
         CounterA.reset()
         # Feature extraction
         f = self.feature_extractor(x)
-        f = self.adaptive_pool(f) 
+        f = self.adaptive_pool(f)
         f = torch.flatten(f, 1)
         
         # Bottleneck mapping

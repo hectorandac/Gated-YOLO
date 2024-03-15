@@ -53,7 +53,7 @@ class ConvModule(nn.Module):
         return self.act(self.conv(x))
 
 class GatingSequential(nn.Sequential):
-    def forward(self, input, gating_decisions):
+    def forward(self, input, gating_decisions = None):
         for module in self:
             input = module(input, gating_decisions)
         return input
@@ -86,7 +86,9 @@ class ConvBNReLU0(nn.Module):
         super().__init__()
         self.block = ConvModule(in_channels, out_channels, kernel_size, stride, 'relu', padding, groups, bias)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if(gating_decisions == None):
+            return self.block(x)
         a = gating_decisions[CounterA.add_1()]
         if a[0] is None:
             return torch.zeros(a[1], device=x.device)
@@ -109,7 +111,9 @@ class ConvBNSiLU0(nn.Module):
         super().__init__()
         self.block = ConvModule(in_channels, out_channels, kernel_size, stride, 'silu', padding, groups, bias)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if(gating_decisions == None):
+            return self.block(x)
         a = gating_decisions[CounterA.add_1()]
         if a[0] is None:
             return torch.zeros(a[1], device=x.device)
@@ -163,7 +167,15 @@ class SPPFModule0(nn.Module):
         self.cv2 = block(c_ * 4, out_channels, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=kernel_size, stride=1, padding=kernel_size // 2)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            x = self.cv1(x)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                y1 = self.m(x)
+                y2 = self.m(y1)
+                return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1))
+        
         x = self.cv1(x, gating_decisions)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
@@ -186,7 +198,9 @@ class SimSPPF0(nn.Module):
         super().__init__()
         self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.sppf(x)
         return self.sppf(x, gating_decisions)
 
 class SPPF0(nn.Module):
@@ -195,7 +209,9 @@ class SPPF0(nn.Module):
         super().__init__()
         self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.sppf(x)
         return self.sppf(x, gating_decisions)
 
 class SPPF(nn.Module):
@@ -247,7 +263,17 @@ class CSPSPPFModule0(nn.Module):
         self.cv6 = block(c_, c_, 3, 1)
         self.cv7 = block(2 * c_, out_channels, 1, 1)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            x1 = self.cv4(self.cv3(self.cv1(x)))
+            y0 = self.cv2(x)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                y1 = self.m(x1)
+                y2 = self.m(y1)
+                y3 = self.cv6(self.cv5(torch.cat([x1, y1, y2, self.m(y2)], 1)))
+            return self.cv7(torch.cat((y0, y3), dim=1))
+    
         x1 = self.cv4(self.cv3(self.cv1(x, gating_decisions), gating_decisions), gating_decisions)
         y0 = self.cv2(x, gating_decisions)
         with warnings.catch_warnings():
@@ -272,7 +298,9 @@ class SimCSPSPPF0(nn.Module):
         super().__init__()
         self.cspsppf = CSPSPPFModule(in_channels, out_channels, kernel_size, e, block)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.cspsppf(x)
         return self.cspsppf(x, gating_decisions)
 
 class CSPSPPF(nn.Module):
@@ -311,7 +339,9 @@ class Transpose0(nn.Module):
             bias=True
         )
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.upsample_transpose(x)
         a = gating_decisions[CounterA.add_1()]
         if a[0] is None:
             return torch.zeros(a[1], device=x.device)
@@ -491,7 +521,19 @@ class RepVGGBlock0(nn.Module):
             self.rbr_dense = ConvModule(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, activation_type=None, padding=padding, groups=groups)
             self.rbr_1x1 = ConvModule(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=stride, activation_type=None, padding=padding_11, groups=groups)
 
-    def forward(self, inputs, gating_decisions):
+    def forward(self, inputs, gating_decisions = None):
+        if gating_decisions == None:
+            '''Forward process'''
+            if hasattr(self, 'rbr_reparam'):
+                return self.nonlinearity(self.se(self.rbr_reparam(inputs)))
+
+            if self.rbr_identity is None:
+                id_out = 0
+            else:
+                id_out = self.rbr_identity(inputs)
+
+            return self.nonlinearity(self.se(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out))
+        
         '''Forward process'''
         if hasattr(self, 'rbr_reparam'):
             a = gating_decisions[CounterA.add_1()]
@@ -819,7 +861,7 @@ class DetectBackend(nn.Module):
         self.__dict__.update(locals())  # assign all variables to self
 
     def forward(self, im, val=False):
-        y, g = self.model(im)
+        y, g, _ = self.model(im)
         if isinstance(y, np.ndarray):
             y = torch.tensor(y, device=self.device)
 
@@ -861,7 +903,13 @@ class RepBlock0(nn.Module):
             n = n // 2
             self.block = GatingSequential(*(BottleRep(out_channels, out_channels, basic_block=basic_block, weight=True) for _ in range(n - 1))) if n > 1 else None
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            x = self.conv1(x)
+            if self.block is not None:
+                x = self.block(x)
+            return x            
+
         x = self.conv1(x, gating_decisions)
         if self.block is not None:
             x = self.block(x, gating_decisions)
@@ -902,7 +950,12 @@ class BottleRep0(nn.Module):
         else:
             self.alpha = 1.0
 
-    def forward(self, x, gatin_decisions):
+    def forward(self, x, gatin_decisions = None):
+        if gatin_decisions == None:
+            outputs = self.conv1(x)
+            outputs = self.conv2(outputs)
+            return outputs + self.alpha * x if self.shortcut else outputs
+        
         outputs = self.conv1(x, gatin_decisions)
         outputs = self.conv2(outputs, gatin_decisions)
         return outputs + self.alpha * x if self.shortcut else outputs 
@@ -963,7 +1016,9 @@ class BepC30(nn.Module):
             self.cv3 = ConvBNSiLU(2 * c_, out_channels, 1, 1)
 
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
         return self.cv3(torch.cat((self.m(self.cv1(x, gating_decisions), gating_decisions), self.cv2(x, gating_decisions)), dim=1), gating_decisions)
 
 class MBLABlock(nn.Module):
@@ -1054,7 +1109,13 @@ class BiFusion0(nn.Module):
 
         self.cv3 = ConvBNReLU(out_channels * 3, out_channels, 1, 1)
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            x0 = self.upsample(x[0])
+            x1 = self.cv1(x[1])
+            x2 = self.downsample(self.cv2(x[2]))
+            return self.cv3(torch.cat((x0, x1, x2), dim=1))
+        
         x0 = self.upsample(x[0], gating_decisions)
         x1 = self.cv1(x[1], gating_decisions)
         x2 = self.downsample(self.cv2(x[2], gating_decisions), gating_decisions)

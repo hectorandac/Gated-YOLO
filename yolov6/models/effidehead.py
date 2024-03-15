@@ -212,6 +212,76 @@ class Detect0(nn.Module):
         self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(), requires_grad=False)
 
     def forward(self, x, gating_decisions=None):
+        if gating_decisions == None:
+            if self.training:
+                cls_score_list = []
+                reg_distri_list = []
+
+                for i in range(self.nl):
+                    x[i] = self.stems[i](x[i])
+                    cls_x = x[i]
+                    reg_x = x[i]
+                    cls_feat = self.cls_convs[i](cls_x)
+                    cls_output = self.cls_preds[i](cls_feat)
+                    reg_feat = self.reg_convs[i](reg_x)
+                    reg_output = self.reg_preds[i](reg_feat)
+
+                    cls_output = torch.sigmoid(cls_output)
+                    cls_score_list.append(cls_output.flatten(2).permute((0, 2, 1)))
+                    reg_distri_list.append(reg_output.flatten(2).permute((0, 2, 1)))
+
+                cls_score_list = torch.cat(cls_score_list, axis=1)
+                reg_distri_list = torch.cat(reg_distri_list, axis=1)
+
+                return x, cls_score_list, reg_distri_list
+            else:
+                cls_score_list = []
+                reg_dist_list = []
+                anchor_points, stride_tensor = generate_anchors(
+                    x, self.stride, self.grid_cell_size, self.grid_cell_offset, device=x[0].device, is_eval=True, mode='af')
+
+                for i in range(self.nl):
+                    b, _, h, w = x[i].shape
+                    l = h * w
+                    x[i] = self.stems[i](x[i])
+                    cls_x = x[i]
+                    reg_x = x[i]
+                    cls_feat = self.cls_convs[i](cls_x)
+                    cls_output = self.cls_preds[i](cls_feat)
+                    reg_feat = self.reg_convs[i](reg_x)
+                    reg_output = self.reg_preds[i](reg_feat)
+
+                    if self.use_dfl:
+                        reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)
+                        reg_output = self.proj_conv(F.softmax(reg_output, dim=1))
+
+                    cls_output = torch.sigmoid(cls_output)
+                    cls_score_list.append(cls_output.reshape([b, self.nc, l]))
+                    reg_dist_list.append(reg_output.reshape([b, 4, l]))
+
+                cls_score_list = torch.cat(cls_score_list, axis=-1).permute(0, 2, 1)
+                reg_dist_list = torch.cat(reg_dist_list, axis=-1).permute(0, 2, 1)
+
+
+                pred_bboxes = dist2bbox(reg_dist_list, anchor_points, box_format='xywh')
+                pred_bboxes *= stride_tensor
+
+                #max_scores, _ = torch.max(cls_score_list, dim=1)
+                #min_scores, _ = torch.min(cls_score_list, dim=1)
+                #mean_scores = torch.mean(cls_score_list, dim=1)
+
+                # Print statistics for each class
+                #for i in range(max_scores.shape[-1]):  # Loop through each class
+                    #print(f"Class {i}: Max score = {max_scores[0, i]}, Min score = {min_scores[0, i]}, Mean score = {mean_scores[0, i]}")
+
+                return torch.cat(
+                    [
+                        pred_bboxes,
+                        torch.ones((b, pred_bboxes.shape[1], 1), device=pred_bboxes.device, dtype=pred_bboxes.dtype),
+                        cls_score_list
+                    ],
+                    axis=-1)
+
         gating_decisions[CounterA.add_1()]
         if self.training:
             cls_score_list = []
@@ -255,20 +325,25 @@ class Detect0(nn.Module):
                     reg_feat = self.reg_convs[i](reg_x, gating_decisions)
 
                     a = gating_decisions[CounterA.add_1()]
-                    if a[0] is None:
-                        cls_output = torch.zeros(a[1], device=device)
-                    else:
-                        uu = self.cls_preds[i](cls_feat)
-                        a[1] = uu.shape
-                        cls_output = uu * a[0]
+                    #if a[0] is None:
+                    #    cls_output = torch.zeros(a[1], device=device)
+                    #else:
+                    #    uu = self.cls_preds[i](cls_feat)
+                    #    a[1] = uu.shape
+                    #    cls_output = uu * a[0]
 
                     c = gating_decisions[CounterA.add_1()]
-                    if c[0] is None:
-                        reg_output = torch.zeros(c[1], device=device)
-                    else:
-                        d = self.reg_preds[i](reg_feat)
-                        c[1] = d.shape
-                        reg_output = d * c[0]
+                    #if c[0] is None:
+                    #    reg_output = torch.zeros(c[1], device=device)
+                    #else:
+                    #    d = self.reg_preds[i](reg_feat)
+                    #    c[1] = d.shape
+                    #    reg_output = d * c[0]
+                    
+                    # Disabling gates from the heads, in practice they are always active
+                    cls_output = self.cls_preds[i](cls_feat)
+                    reg_output = self.reg_preds[i](reg_feat)
+
 
                     if self.use_dfl:
                         reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)

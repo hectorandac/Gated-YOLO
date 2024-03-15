@@ -221,7 +221,7 @@ class RepBiFPANNeck0(nn.Module):
     def forward(self, input, gating_decisions):
         (x3, x2, x1, x0) = input
 
-        if self.enable_gater_net:
+        if gating_decisions != None:
             fpn_out0 = self.reduce_layer0(x0, gating_decisions)
             f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
             f_out0 = self.Rep_p4(f_concat_layer0,  gating_decisions)
@@ -1170,12 +1170,9 @@ class GatedCSPRepBiFPANNeck(nn.Module):
 
 
     def forward(self, input, gating_decisions = None):
-
         (x3, x2, x1, x0) = input
 
-        if self.enable_gater_net:
-            assert gating_decisions != None
-            
+        if gating_decisions != None:
             fpn_out0 = self.reduce_layer0(x0, gating_decisions)
             f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
             f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions)

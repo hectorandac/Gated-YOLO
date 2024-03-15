@@ -110,17 +110,32 @@ class Trainer:
         self.enable_fixed_gates = args.enable_fixed_gates
         self.fixed_gates = args.fixed_gates
 
-        self.model.neck.enable_gater_net = args.enable_gater_net
-        self.model.neck.enable_fixed_gates = args.enable_fixed_gates
-        self.model.neck.fixed_gates = args.fixed_gates
+        ddp_mode = device.type != 'cpu' and args.rank != -1
 
-        self.model.backbone.enable_gater_net = args.enable_gater_net
-        self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
-        self.model.backbone.fixed_gates = args.fixed_gates
+        if ddp_mode:
+            self.model.module.neck.enable_gater_net = args.enable_gater_net
+            self.model.module.neck.enable_fixed_gates = args.enable_fixed_gates
+            self.model.module.neck.fixed_gates = args.fixed_gates
 
-        self.model.gater.enable_gater_net = args.enable_gater_net
-        self.model.gater.enable_fixed_gates = args.enable_fixed_gates
-        self.model.gater.fixed_gates = args.fixed_gates
+            self.model.module.backbone.enable_gater_net = args.enable_gater_net
+            self.model.module.backbone.enable_fixed_gates = args.enable_fixed_gates
+            self.model.module.backbone.fixed_gates = args.fixed_gates
+
+            self.model.module.gater.enable_gater_net = args.enable_gater_net
+            self.model.module.gater.enable_fixed_gates = args.enable_fixed_gates
+            self.model.module.gater.fixed_gates = args.fixed_gates
+        else:
+            self.model.neck.enable_gater_net = args.enable_gater_net
+            self.model.neck.enable_fixed_gates = args.enable_fixed_gates
+            self.model.neck.fixed_gates = args.fixed_gates
+
+            self.model.backbone.enable_gater_net = args.enable_gater_net
+            self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
+            self.model.backbone.fixed_gates = args.fixed_gates
+
+            self.model.gater.enable_gater_net = args.enable_gater_net
+            self.model.gater.enable_fixed_gates = args.enable_fixed_gates
+            self.model.gater.fixed_gates = args.fixed_gates
 
         self.loss_num = 4 if args.enable_gater_net else 3
         self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
@@ -186,10 +201,11 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 0.0002, gates) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1.25, gates) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size
+        
         # backward
         self.scaler.scale(total_loss).backward()
         self.loss_items = loss_items
@@ -311,7 +327,6 @@ class Trainer:
             self.best_ap = self.evaluate_results[1]
             self.best_stop_strong_aug_ap = self.evaluate_results[1]
 
-        print(self.data_dict['nc'])
         self.compute_loss = ComputeLoss(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
                                         warmup_epoch=self.cfg.model.head.atss_warmup_epoch,
@@ -485,7 +500,7 @@ class Trainer:
         # If DDP mode
         ddp_mode = device.type != 'cpu' and args.rank != -1
         if ddp_mode:
-            model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank)
+            model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True)
 
         return model
 

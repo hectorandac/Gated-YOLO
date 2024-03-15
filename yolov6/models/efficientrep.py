@@ -360,7 +360,22 @@ class EfficientRep0(nn.Module):
             )
         )
 
-    def forward(self, x, gating_decisions):
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            outputs = []
+            x = self.stem(x)
+            x = self.ERBlock_2(x)
+            if self.fuse_P2:
+                outputs.append(x)
+            x = self.ERBlock_3(x)
+            outputs.append(x)
+            x = self.ERBlock_4(x)
+            outputs.append(x)
+            x = self.ERBlock_5(x)
+            outputs.append(x)
+
+            return tuple(outputs)
+        
         outputs = []
         x = self.stem(x, gating_decisions)
         x = self.ERBlock_2(x, gating_decisions)
@@ -1018,25 +1033,7 @@ class CSPBepBackbone0(nn.Module):
         )
 
     def forward(self, x, gating_decisions = None):
-        if self.enable_gater_net:
-            outputs = []
-            x = self.stem(x, gating_decisions)
-            x = self.ERBlock_2(x, gating_decisions)
-
-            if self.fuse_P2:
-                outputs.append(x)
-
-            x = self.ERBlock_3(x, gating_decisions)
-            outputs.append(x)
-
-            x = self.ERBlock_4(x, gating_decisions)
-            outputs.append(x)
-            
-            x = self.ERBlock_5(x, gating_decisions)
-            outputs.append(x)
-
-            return tuple(outputs)
-        else: 
+        if gating_decisions == None:
             outputs = []
             x = self.stem(x)
             x = self.ERBlock_2(x)
@@ -1050,6 +1047,20 @@ class CSPBepBackbone0(nn.Module):
             outputs.append(x)
 
             return tuple(outputs)
+        
+        outputs = []
+        x = self.stem(x, gating_decisions)
+        x = self.ERBlock_2(x, gating_decisions)
+        if self.fuse_P2:
+            outputs.append(x)
+        x = self.ERBlock_3(x, gating_decisions)
+        outputs.append(x)
+        x = self.ERBlock_4(x, gating_decisions)
+        outputs.append(x)
+        x = self.ERBlock_5(x, gating_decisions)
+        outputs.append(x)
+
+        return tuple(outputs)
 
 
 class CSPBepBackbone_P6(nn.Module):
