@@ -79,19 +79,9 @@ def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
 
     if len(losses) >= 4:
         tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
-        tblogger.add_scalar("train/dvt_loss", losses[4], epoch + 1)
         percentage_open_gates = [calculate_open_gates_percentage(layer_gates) for layer_gates in gates]
         save_proportions_to_file(percentage_open_gates)
         tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1, bins=100)
-
-        # Generate heatmap data
-        #data_over_time.append(percentage_open_gates)
-
-        ## Create a heatmap figure
-        #fig, ax = plt.subplots()
-        #sns.heatmap(data_over_time, annot=False, cmap='viridis', ax=ax)
-        #image = data_to_image(fig)
-        #tblogger.add_image(f'Gates progression', image, epoch + 1, dataformats='HWC')
             
 
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)

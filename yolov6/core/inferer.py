@@ -127,6 +127,7 @@ class Inferer:
         fps_calculator = CalcFPS()
         min_fps = float('inf')
         max_fps = 0
+        avg_fps = 0
 
         if analyze and enable_gater_net:
             gating_accumulator = None
