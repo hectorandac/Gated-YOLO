@@ -131,7 +131,7 @@ class RepPANNeck(nn.Module):
         return outputs
 
 
-class RepBiFPANNeck(nn.Module):
+class RepBiFPANNeck0(nn.Module):
     """RepBiFPANNeck Module
     """
     # [64, 128, 256, 512, 1024]
@@ -262,7 +262,7 @@ class RepBiFPANNeck(nn.Module):
 
         return outputs
     
-class RepBiFPANNeck1(nn.Module):
+class RepBiFPANNeck(nn.Module):
     """RepBiFPANNeck Module
     """
     # [64, 128, 256, 512, 1024]
@@ -796,7 +796,7 @@ class CSPRepPANNeck(nn.Module):
         return outputs
 
 
-class CSPRepBiFPANNeck1(nn.Module):
+class CSPRepBiFPANNeck(nn.Module):
     """
     CSPRepBiFPANNeck module.
     """
@@ -917,7 +917,7 @@ class CSPRepBiFPANNeck1(nn.Module):
 
         return outputs
 
-class GatedCSPRepBiFPANNeck(nn.Module):
+class CSPRepBiFPANNeck0(nn.Module):
     """
     GatedCSPRepBiFPANNeck module.
     """
@@ -1071,7 +1071,7 @@ class GatedCSPRepBiFPANNeck(nn.Module):
 
         return outputs
 
-class CSPRepBiFPANNeck(nn.Module):
+class GatedCSPRepBiFPANNeck(nn.Module):
     """
     GatedCSPRepBiFPANNeck module.
     """

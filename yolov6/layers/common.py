@@ -71,7 +71,7 @@ class CounterA:
         global counter
         counter = -1
 
-class ConvBNReLU1(nn.Module):
+class ConvBNReLU(nn.Module):
     '''Conv and BN with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=None, groups=1, bias=False):
         super().__init__()
@@ -80,7 +80,7 @@ class ConvBNReLU1(nn.Module):
     def forward(self, x):
         return self.block(x)
 
-class ConvBNReLU(nn.Module):
+class ConvBNReLU0(nn.Module):
     '''Conv and BN with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=None, groups=1, bias=False):
         super().__init__()
@@ -96,7 +96,7 @@ class ConvBNReLU(nn.Module):
         a[1] = b.shape
         return b * a[0]
 
-class ConvBNSiLU1(nn.Module):
+class ConvBNSiLU(nn.Module):
     '''Conv and BN with SiLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=None, groups=1, bias=False):
         super().__init__()
@@ -105,7 +105,7 @@ class ConvBNSiLU1(nn.Module):
     def forward(self, x):
         return self.block(x)
 
-class ConvBNSiLU(nn.Module):
+class ConvBNSiLU0(nn.Module):
     '''Conv and BN with SiLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=None, groups=1, bias=False):
         super().__init__()
@@ -141,7 +141,7 @@ class ConvBNHS(nn.Module):
         return self.block(x)
 
 
-class SPPFModule1(nn.Module):
+class SPPFModule(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNReLU):
         super().__init__()
@@ -158,7 +158,7 @@ class SPPFModule1(nn.Module):
             y2 = self.m(y1)
             return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1))
 
-class SPPFModule(nn.Module):
+class SPPFModule0(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNReLU):
         super().__init__()
@@ -183,7 +183,7 @@ class SPPFModule(nn.Module):
             y2 = self.m(y1)
             return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1), gating_decisions)
 
-class SimSPPF1(nn.Module):
+class SimSPPF(nn.Module):
     '''Simplified SPPF with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNReLU):
         super().__init__()
@@ -192,9 +192,20 @@ class SimSPPF1(nn.Module):
     def forward(self, x):
         return self.sppf(x)
 
-class SimSPPF(nn.Module):
+class SimSPPF0(nn.Module):
     '''Simplified SPPF with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNReLU):
+        super().__init__()
+        self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
+
+    def forward(self, x, gating_decisions = None):
+        if gating_decisions == None:
+            return self.sppf(x)
+        return self.sppf(x, gating_decisions)
+
+class SPPF0(nn.Module):
+    '''SPPF with SiLU activation'''
+    def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNSiLU):
         super().__init__()
         self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
 
@@ -209,21 +220,10 @@ class SPPF(nn.Module):
         super().__init__()
         self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
 
-    def forward(self, x, gating_decisions = None):
-        if gating_decisions == None:
-            return self.sppf(x)
-        return self.sppf(x, gating_decisions)
-
-class SPPF1(nn.Module):
-    '''SPPF with SiLU activation'''
-    def __init__(self, in_channels, out_channels, kernel_size=5, block=ConvBNSiLU):
-        super().__init__()
-        self.sppf = SPPFModule(in_channels, out_channels, kernel_size, block)
-
     def forward(self, x):
         return self.sppf(x)
 
-class CSPSPPFModule1(nn.Module):
+class CSPSPPFModule(nn.Module):
     # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, in_channels, out_channels, kernel_size=5, e=0.5, block=ConvBNReLU):
         super().__init__()
@@ -248,7 +248,7 @@ class CSPSPPFModule1(nn.Module):
             y3 = self.cv6(self.cv5(torch.cat([x1, y1, y2, self.m(y2)], 1)))
         return self.cv7(torch.cat((y0, y3), dim=1))
 
-class CSPSPPFModule(nn.Module):
+class CSPSPPFModule0(nn.Module):
     # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, in_channels, out_channels, kernel_size=5, e=0.5, block=ConvBNReLU):
         super().__init__()
@@ -283,7 +283,7 @@ class CSPSPPFModule(nn.Module):
             y3 = self.cv6(self.cv5(torch.cat([x1, y1, y2, self.m(y2)], 1), gating_decisions), gating_decisions)
         return self.cv7(torch.cat((y0, y3), dim=1), gating_decisions)
 
-class SimCSPSPPF1(nn.Module):
+class SimCSPSPPF(nn.Module):
     '''CSPSPPF with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=5, e=0.5, block=ConvBNReLU):
         super().__init__()
@@ -292,7 +292,7 @@ class SimCSPSPPF1(nn.Module):
     def forward(self, x):
         return self.cspsppf(x)
 
-class SimCSPSPPF(nn.Module):
+class SimCSPSPPF0(nn.Module):
     '''CSPSPPF with ReLU activation'''
     def __init__(self, in_channels, out_channels, kernel_size=5, e=0.5, block=ConvBNReLU):
         super().__init__()
@@ -312,7 +312,7 @@ class CSPSPPF(nn.Module):
     def forward(self, x):
         return self.cspsppf(x)
 
-class Transpose1(nn.Module):
+class Transpose(nn.Module):
     '''Normal Transpose, default for upsampling'''
     def __init__(self, in_channels, out_channels, kernel_size=2, stride=2):
         super().__init__()
@@ -327,7 +327,7 @@ class Transpose1(nn.Module):
     def forward(self, x):
         return self.upsample_transpose(x)
 
-class Transpose(nn.Module):
+class Transpose0(nn.Module):
     '''Normal Transpose, default for upsampling'''
     def __init__(self, in_channels, out_channels, kernel_size=2, stride=2):
         super().__init__()
@@ -349,7 +349,7 @@ class Transpose(nn.Module):
         a[1] = b.shape
         return b * a[0]
 
-class RepVGGBlock1(nn.Module):
+class RepVGGBlock(nn.Module):
     '''RepVGGBlock is a basic rep-style block, including training and deploy status
     This code is based on https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py
     '''
@@ -473,7 +473,7 @@ class RepVGGBlock1(nn.Module):
             self.__delattr__('id_tensor')
         self.deploy = True
 
-class RepVGGBlock(nn.Module):
+class RepVGGBlock0(nn.Module):
     '''RepVGGBlock is a basic rep-style block, including training and deploy status
     This code is based on https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py
     '''
@@ -869,7 +869,7 @@ class DetectBackend(nn.Module):
         return y, g
 
 
-class RepBlock1(nn.Module):
+class RepBlock(nn.Module):
     '''
         RepBlock is a stage block with rep-style basic block
     '''
@@ -889,7 +889,7 @@ class RepBlock1(nn.Module):
             x = self.block(x)
         return x
 
-class RepBlock(nn.Module):
+class RepBlock0(nn.Module):
     '''
         RepBlock is a stage block with rep-style basic block
     '''
@@ -915,7 +915,7 @@ class RepBlock(nn.Module):
             x = self.block(x, gating_decisions)
         return x
 
-class BottleRep1(nn.Module):
+class BottleRep(nn.Module):
 
     def __init__(self, in_channels, out_channels, basic_block=RepVGGBlock, weight=False):
         super().__init__()
@@ -935,7 +935,7 @@ class BottleRep1(nn.Module):
         outputs = self.conv2(outputs)
         return outputs + self.alpha * x if self.shortcut else outputs
 
-class BottleRep(nn.Module):
+class BottleRep0(nn.Module):
 
     def __init__(self, in_channels, out_channels, basic_block=RepVGGBlock, weight=False):
         super().__init__()
@@ -983,7 +983,7 @@ class BottleRep3(nn.Module):
         return outputs + self.alpha * x if self.shortcut else outputs
 
 
-class BepC31(nn.Module):
+class BepC3(nn.Module):
     '''CSPStackRep Block'''
     def __init__(self, in_channels, out_channels, n=1, e=0.5, block=RepVGGBlock):
         super().__init__()
@@ -1001,7 +1001,7 @@ class BepC31(nn.Module):
     def forward(self, x):
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
 
-class BepC3(nn.Module):
+class BepC30(nn.Module):
     '''CSPStackRep Block'''
     def __init__(self, in_channels, out_channels, n=1, e=0.5, block=RepVGGBlock):
         super().__init__()
@@ -1063,7 +1063,7 @@ class MBLABlock(nn.Module):
         return self.cv2(torch.cat(all_y, 1))
 
 
-class BiFusion1(nn.Module):
+class BiFusion(nn.Module):
     '''BiFusion Block in PAN'''
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -1088,7 +1088,7 @@ class BiFusion1(nn.Module):
         x2 = self.downsample(self.cv2(x[2]))
         return self.cv3(torch.cat((x0, x1, x2), dim=1))
 
-class BiFusion(nn.Module):
+class BiFusion0(nn.Module):
     '''BiFusion Block in PAN'''
     def __init__(self, in_channels, out_channels):
         super().__init__()
