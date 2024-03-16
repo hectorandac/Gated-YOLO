@@ -1,8 +1,14 @@
 import torch
 import matplotlib.pyplot as plt
+import argparse
 
-# Load gating decisions
-gating_decisions = torch.load('runs/inference/exp1/gates.pt')
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Analyze gating decisions.")
+parser.add_argument("--file_path", type=str, required=True, help="Path to the .pt file containing gating decisions.")
+args = parser.parse_args()
+
+# Load gating decisions from specified file path
+gating_decisions = torch.load(args.file_path)
 
 # Number of layers per group
 layers_per_group = 1  # Modify this to change the grouping
