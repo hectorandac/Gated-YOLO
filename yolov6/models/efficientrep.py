@@ -797,7 +797,7 @@ class PermanentGatedCSPBepBackbone(nn.Module):
 
         return tuple(outputs), None
 
-class CSPBepBackbone(nn.Module):
+class CSPBepBackbone1(nn.Module):
     """
     CSPBepBackbone module.
     """
@@ -922,7 +922,7 @@ class CSPBepBackbone(nn.Module):
 
         return tuple(outputs)
 
-class CSPBepBackbone0(nn.Module):
+class CSPBepBackbone(nn.Module):
     """
     CSPBepBackbone module.
     """
