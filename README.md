@@ -16,17 +16,17 @@ Implementation of the Gated YOLO architecture introduces a dynamic gating mechan
 
 ## Quick Start
 
-<details>
+<details open>
 <summary> Install</summary>
 
 ```shell
-git clone https://github.com/yourGitHub/GatedYOLO
-cd GatedYOLO
+git clone https://github.com/hectorandac/Gated-YOLOv6
+cd Gated-YOLOv6
 pip install -r requirements.txt
 ```
 </details>
 
-<details open>
+<details>
 <summary> Finetune on Custom Data</summary>
 
 Single GPU
