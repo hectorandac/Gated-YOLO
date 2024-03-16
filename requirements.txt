@@ -12,4 +12,4 @@ onnx>=1.10.0
 onnxsim>=0.3.6
 requests
 thop
-pytorch_quantization>=2.1.1
+pytorch_quantization==2.1.3
