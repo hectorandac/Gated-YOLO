@@ -5,7 +5,7 @@
 <br>
 
 <div>
-    <a href="https://colab.research.google.com/github/yourGitHub/GatedYOLO/blob/main/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
+    <a href="https://colab.research.google.com/drive/1cC5CRpuY8-W54FhZdUyD1N7FXPtq9vIE?usp=sharing"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
     <a href="https://www.kaggle.com/code/yourUsername/gated-yolo"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"></a>
 </div>
 <br>
