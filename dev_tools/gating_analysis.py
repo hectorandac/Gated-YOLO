@@ -11,7 +11,7 @@ args = parser.parse_args()
 gating_decisions = torch.load(args.file_path)
 
 # Number of layers per group
-layers_per_group = 1  # Modify this to change the grouping
+layers_per_group = 5  # Modify this to change the grouping
 
 # Group layers and analyze
 grouped_analysis = []
