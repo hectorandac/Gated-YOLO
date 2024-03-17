@@ -17,14 +17,13 @@ class Model(nn.Module):
     The default parts are EfficientRep Backbone, Rep-PAN and
     Efficient Decoupled Head.
     '''
-    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False, enable_gater_net=False):  # model, input channels, number of classes
+    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False):  # model, input channels, number of classes
         super().__init__()
         # Build network
         num_layers = config.model.head.num_layers
         self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns)
         self.detect.inference_with_mask = False
         self.neck.inference_with_mask = False
-        self.enable_gater_net = enable_gater_net
 
         # Init Detect head
         self.stride = self.detect.stride
@@ -32,6 +31,21 @@ class Model(nn.Module):
 
         # Init weights
         initialize_weights(self)
+
+    def assign_gates(self, enable_gater_net, enable_fixed_gates, fixed_gates):
+        self.enable_gater_net = enable_gater_net
+
+        self.neck.enable_gater_net = enable_gater_net
+        self.neck.enable_fixed_gates = enable_fixed_gates
+        self.neck.fixed_gates = fixed_gates
+
+        self.backbone.enable_gater_net = enable_gater_net
+        self.backbone.enable_fixed_gates = enable_fixed_gates
+        self.backbone.fixed_gates = fixed_gates
+
+        self.gater.enable_gater_net = enable_gater_net
+        self.gater.enable_fixed_gates = enable_fixed_gates
+        self.gater.fixed_gates = fixed_gates
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
@@ -51,43 +65,6 @@ class Model(nn.Module):
         else:
             x = self.detect(x, gating_decisions)
             return x, gating_decisions, None
-            
-    def forward1(self, x):
-        export_mode = torch.onnx.is_in_onnx_export()
-        x = self.backbone(x)
-        x = self.neck(x)
-        if export_mode == False:
-            featmaps = []
-            featmaps.extend(x)
-        x = self.detect(x)
-        return [x, None] if export_mode is True else [x, None, featmaps]
-
-    def prune_regions(self, x, source_mask, path):
-        CounterA.reset()
-        if not self.enable_gater_net:
-            x = self.backbone(x)
-            x = self.neck(x)
-        else:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
-            x = self.backbone(x, gating_decisions)
-            x = self.neck(x, gating_decisions)
-
-        mask = [None for _ in range(len(x))]
-        n_type = x[0].dtype
-        n_device = x[0].device
-
-        for i in range(min(len(source_mask), len(x))):
-            b, g, h, w = x[i].shape
-            original_mask_tensor = torch.tensor(source_mask[i], dtype=n_type, device=n_device)
-            interpolated_mask = F.interpolate(original_mask_tensor.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest')
-            expanded_mask = interpolated_mask.expand(b, g, -1, -1)
-            
-            # Check if the tensor is all zeros. If it is, set the mask entry to None.
-            if not expanded_mask.eq(0).all():
-                mask[i] = expanded_mask
-
-        torch.save(mask, path + "/masks.pt")
-
 
     def _apply(self, fn):
         self = super()._apply(fn)
@@ -221,6 +198,6 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
     return backbone, neck, head, gater
 
 
-def build_model(cfg, num_classes, device, fuse_ab=False, distill_ns=False, enable_gater_net=False):
-    model = Model(cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net).to(device)
+def build_model(cfg, num_classes, device, fuse_ab=False, distill_ns=False):
+    model = Model(cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns).to(device)
     return model

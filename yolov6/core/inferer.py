@@ -26,8 +26,7 @@ from PIL import Image
 from collections import defaultdict
 
 class Inferer:
-    def __init__(self, source, webcam, webcam_addr, weights, device, yaml, img_size, half):
-
+    def __init__(self, source, webcam, webcam_addr, weights, device, yaml, img_size, half, enable_gater_net = False, fixed_gates = None, enable_fixed_gates = False):
         self.__dict__.update(locals())
 
         # Init model
@@ -84,6 +83,11 @@ class Inferer:
         self.webcam_addr = webcam_addr
         self.files = LoadData(source, webcam, webcam_addr)
         self.source = source
+        
+        if enable_gater_net and enable_fixed_gates:
+            self.model.model.assign_gates(enable_gater_net, enable_fixed_gates, torch.load(fixed_gates))
+        else:
+            self.model.model.assign_gates(enable_gater_net, enable_fixed_gates, None)
 
 
     def model_switch(self, model, img_size):
@@ -99,29 +103,8 @@ class Inferer:
 
     def infer(
         self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True,
-        analyze=False, inference_with_mask=False, masks=None,
-        enable_gater_net=False, fixed_gates=None, enable_fixed_gates=False):
+        analyze=False, enable_gater_net=False):
         ''' Model Inference and results visualization '''
-        if inference_with_mask:
-            assert masks is not None
-            print("Processing with mask")
-            self.model.model.detect.inference_with_mask = True
-            self.model.model.detect.masks = torch.load(masks)
-            
-            self.model.model.neck.inference_with_mask = True
-            self.model.model.neck.masks = torch.load(masks)
-
-        if enable_gater_net and enable_fixed_gates:
-            self.model.model.gater.fixed_gates = torch.load(fixed_gates)
-        
-        #self.model.model.neck.enable_gater_net = enable_gater_net
-        #self.model.model.neck.enable_fixed_gates = enable_fixed_gates
-        
-        #self.model.model.backbone.enable_gater_net = enable_gater_net
-        #self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
-
-        #self.model.model.gater.enable_gater_net = enable_gater_net
-        #self.model.model.gater.enable_fixed_gates = enable_fixed_gates
         
         vid_path, vid_writer, windows = None, None, []
         fps_calculator = CalcFPS()

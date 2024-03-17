@@ -132,11 +132,10 @@ def run(weights=osp.join(ROOT, 'yolov6s.pt'),
             os.makedirs(save_txt_path)
 
     # Inference
-    inferer = Inferer(source, webcam, webcam_addr, weights, device, yaml, img_size, half)
+    inferer = Inferer(source, webcam, webcam_addr, weights, device, yaml, img_size, half, enable_gater_net, fixed_gates, enable_fixed_gates)
     inferer.infer(
         conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, not not_save_img,
-        hide_labels, hide_conf, view_img, analyze, inference_with_mask, masks,
-        enable_gater_net, fixed_gates, enable_fixed_gates)
+        hide_labels, hide_conf, view_img, analyze, enable_gater_net)
 
     if save_txt or not not_save_img:
         LOGGER.info(f"Results saved to {save_dir}")

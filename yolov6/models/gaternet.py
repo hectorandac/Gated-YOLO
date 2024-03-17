@@ -19,7 +19,7 @@ class GaterNetwork(nn.Module):
         self.batch_norm = nn.BatchNorm1d(bottleneck_size)
         self.sections = sections
 
-        self.enable_fixed_gates = False # default 
+        self.enable_fixed_gates = False 
 
     def forward(self, x, training=False, epsilon=None):
         if self.enable_fixed_gates:
