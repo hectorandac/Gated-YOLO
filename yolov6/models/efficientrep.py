@@ -121,14 +121,6 @@ class GatedEfficientRep(nn.Module):
             channels_list[10]
             ]
         
-        num_filters = sum(self.gaterChannels) if channels_list else 0
-
-        self.gater = GaterNetwork(
-            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
-            num_features=num_features,
-            num_filters=num_filters,
-            bottleneck_size=bottleneck_size
-        )
 
     def forward(self, x):
         gating_decisions = self.gater(x, training=self.training, epsilon=self.epsilon if self.training else 0)

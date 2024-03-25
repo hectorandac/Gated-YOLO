@@ -215,7 +215,7 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
         num_features=204800,         # Number of output features from the feature extractor
         num_filters=num_filters,
         sections=cumulativeGatesChannels,
-        bottleneck_size=128,         # Size of the bottleneck in the GaterNetwork
+        bottleneck_size=1024,         # Size of the bottleneck in the GaterNetwork
     )
 
     return backbone, neck, head, gater

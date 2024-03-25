@@ -183,7 +183,7 @@ class ComputeLoss:
         if gating_decision is not None:
             g_reconstructed = torch.cat([gd[0].flatten(start_dim=1) for gd in gating_decision], dim=1)
             gating_loss = g_reconstructed.mean(dim=1).mean()
-            gating_loss = gating_loss * lambda_reg
+            gating_loss = (gating_loss * lambda_reg) + (loss_cls * 0.25)
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
 
