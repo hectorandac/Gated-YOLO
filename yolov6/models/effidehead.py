@@ -7,7 +7,7 @@ from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox
 
 
-class Detect1(nn.Module):
+class Detect(nn.Module):
     export = False
     '''Efficient Decoupled Head
     With hardware-aware degisn, the decoupled head is optimized with
@@ -144,7 +144,7 @@ class Detect1(nn.Module):
                 ],
                 axis=-1)
 
-class Detect(nn.Module):
+class Detect0(nn.Module):
     export = False
     '''Efficient Decoupled Head
     With hardware-aware degisn, the decoupled head is optimized with
