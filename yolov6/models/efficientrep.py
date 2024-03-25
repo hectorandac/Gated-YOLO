@@ -143,7 +143,7 @@ class GatedEfficientRep(nn.Module):
 
         return tuple(outputs), gating_decisions
     
-class EfficientRep(nn.Module):
+class EfficientRep1(nn.Module):
     '''EfficientRep Backbone
     EfficientRep is handcrafted by hardware-aware neural network design.
     With rep-style struct, EfficientRep is friendly to high-computation hardware(e.g. GPU).
@@ -255,7 +255,7 @@ class EfficientRep(nn.Module):
 
         return tuple(outputs)
 
-class EfficientRep0(nn.Module):
+class EfficientRep(nn.Module):
     '''EfficientRep Backbone
     EfficientRep is handcrafted by hardware-aware neural network design.
     With rep-style struct, EfficientRep is friendly to high-computation hardware(e.g. GPU).
@@ -789,7 +789,7 @@ class PermanentGatedCSPBepBackbone(nn.Module):
 
         return tuple(outputs), None
 
-class CSPBepBackbone(nn.Module):
+class CSPBepBackbone1(nn.Module):
     """
     CSPBepBackbone module.
     """
@@ -914,7 +914,7 @@ class CSPBepBackbone(nn.Module):
 
         return tuple(outputs)
 
-class CSPBepBackbone0(nn.Module):
+class CSPBepBackbone(nn.Module):
     """
     CSPBepBackbone module.
     """

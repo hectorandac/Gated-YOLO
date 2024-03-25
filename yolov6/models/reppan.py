@@ -131,7 +131,7 @@ class RepPANNeck(nn.Module):
         return outputs
 
 
-class RepBiFPANNeck0(nn.Module):
+class RepBiFPANNeck(nn.Module):
     """RepBiFPANNeck Module
     """
     # [64, 128, 256, 512, 1024]
@@ -262,7 +262,7 @@ class RepBiFPANNeck0(nn.Module):
 
         return outputs
     
-class RepBiFPANNeck(nn.Module):
+class RepBiFPANNeck1(nn.Module):
     """RepBiFPANNeck Module
     """
     # [64, 128, 256, 512, 1024]
