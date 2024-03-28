@@ -130,7 +130,6 @@ class RepPANNeck(nn.Module):
 
         return outputs
 
-
 class RepBiFPANNeck(nn.Module):
     """RepBiFPANNeck Module
     """
