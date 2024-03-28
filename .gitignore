@@ -118,8 +118,6 @@ venv.bak/
 *.pt
 *.engine
 
-dev_tools/
-
 *.whl
 
 data/images/videoplayback.mp4
