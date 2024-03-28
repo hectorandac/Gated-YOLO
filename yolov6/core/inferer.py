@@ -99,17 +99,8 @@ class Inferer:
 
     def infer(
         self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True,
-        analyze=False, inference_with_mask=False, masks=None,
-        enable_gater_net=False, fixed_gates=None, enable_fixed_gates=False):
+        analyze=False, enable_gater_net=False, fixed_gates=None, enable_fixed_gates=False):
         ''' Model Inference and results visualization '''
-        if inference_with_mask:
-            assert masks is not None
-            print("Processing with mask")
-            self.model.model.detect.inference_with_mask = True
-            self.model.model.detect.masks = torch.load(masks)
-            
-            self.model.model.neck.inference_with_mask = True
-            self.model.model.neck.masks = torch.load(masks)
 
         if enable_gater_net and enable_fixed_gates:
             self.model.model.gater.fixed_gates = torch.load(fixed_gates)
@@ -306,8 +297,6 @@ class Inferer:
             img = img.to(self.device)
             if len(img.shape) == 3:
                 img = img[None]
-            #self.model.model.prune_regions(img, heat_maps, save_dir)
-            #np.save(save_dir + '/kernel.npy', heat_maps)
 
     def first_and_others(generator):
         iterator = iter(generator)

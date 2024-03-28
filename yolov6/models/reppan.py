@@ -1016,36 +1016,25 @@ class CSPRepBiFPANNeck(nn.Module):
 
 
     def forward(self, input, gating_decisions = None):
-
         (x3, x2, x1, x0) = input
 
         if self.enable_gater_net:
-            assert gating_decisions != None
             
             fpn_out0 = self.reduce_layer0(x0, gating_decisions)
             f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
-            f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions)
-            
-            if self.inference_with_mask and self.masks[0] is None:
-                pan_out2 = torch.zeros_like(x2)
-            else:
-                fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
-                f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
-                pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
+            f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions) 
 
-            if self.inference_with_mask and self.masks[1] is None or gating_decisions[7] is None:
-                pan_out1 = torch.zeros_like(x1)
-            else:
-                down_feat1 = self.downsample2(pan_out2, gating_decisions)
-                p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-                pan_out1 = self.Rep_n3(p_concat_layer1, gating_decisions)
+            fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
+            f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
+            pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
 
-            if self.inference_with_mask and self.masks[2] is None or gating_decisions[8] is None:
-                pan_out0 = torch.zeros_like(x0)
-            else:
-                down_feat0 = self.downsample1(pan_out1, gating_decisions)
-                p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-                pan_out0 = self.Rep_n4(p_concat_layer2, gating_decisions)
+            down_feat1 = self.downsample2(pan_out2, gating_decisions)
+            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+            pan_out1 = self.Rep_n3(p_concat_layer1, gating_decisions)
+
+            down_feat0 = self.downsample1(pan_out1, gating_decisions)
+            p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
+            pan_out0 = self.Rep_n4(p_concat_layer2, gating_decisions)
 
             outputs = [pan_out2, pan_out1, pan_out0]
 
@@ -1177,26 +1166,17 @@ class GatedCSPRepBiFPANNeck(nn.Module):
             f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
             f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions)
             
-            if self.inference_with_mask and self.masks[0] is None:
-                pan_out2 = torch.zeros_like(x2)
-            else:
-                fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
-                f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
-                pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
+            fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
+            f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
+            pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
 
-            if self.inference_with_mask and self.masks[1] is None or gating_decisions[7] is None:
-                pan_out1 = torch.zeros_like(x1)
-            else:
-                down_feat1 = self.downsample2(pan_out2, gating_decisions)
-                p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-                pan_out1 = self.Rep_n3(p_concat_layer1, gating_decisions)
+            down_feat1 = self.downsample2(pan_out2, gating_decisions)
+            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+            pan_out1 = self.Rep_n3(p_concat_layer1, gating_decisions)
 
-            if self.inference_with_mask and self.masks[2] is None or gating_decisions[8] is None:
-                pan_out0 = torch.zeros_like(x0)
-            else:
-                down_feat0 = self.downsample1(pan_out1, gating_decisions)
-                p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-                pan_out0 = self.Rep_n4(p_concat_layer2, gating_decisions)
+            down_feat0 = self.downsample1(pan_out1, gating_decisions)
+            p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
+            pan_out0 = self.Rep_n4(p_concat_layer2, gating_decisions)
 
             outputs = [pan_out2, pan_out1, pan_out0]
 
@@ -1805,7 +1785,6 @@ class RepBiFPANNeck6Sim(nn.Module):
 
         (x4, x3, x2, x1, x0) = input
 
-        # Always compute these operations
         fpn_out0 = self.reduce_layer0(x0)
         f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
         f_out0 = self.Rep_p5(f_concat_layer0)
@@ -1818,27 +1797,17 @@ class RepBiFPANNeck6Sim(nn.Module):
         f_concat_layer2 = self.Bifusion2([fpn_out2, x3, x4])
         pan_out3 = self.Rep_p3(f_concat_layer2) # P3
 
-        # Check mask value and skip computation if necessary (only during inference)
-        if self.inference_with_mask and self.masks[0] is None:
-            pan_out2 = torch.zeros_like(x2)
-        else:
-            down_feat2 = self.downsample2(pan_out3)
-            p_concat_layer2 = torch.cat([down_feat2, fpn_out2], 1)
-            pan_out2 = self.Rep_n4(p_concat_layer2)  # P4
+        down_feat2 = self.downsample2(pan_out3)
+        p_concat_layer2 = torch.cat([down_feat2, fpn_out2], 1)
+        pan_out2 = self.Rep_n4(p_concat_layer2)  # P4
 
-        if self.inference_with_mask and self.masks[1] is None:
-            pan_out1 = torch.zeros_like(x1)
-        else:
-            down_feat1 = self.downsample1(pan_out2)
-            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-            pan_out1 = self.Rep_n5(p_concat_layer1)  # P5
+        down_feat1 = self.downsample1(pan_out2)
+        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+        pan_out1 = self.Rep_n5(p_concat_layer1)  # P5
 
-        if self.inference_with_mask and self.masks[2] is None:
-            pan_out0 = torch.zeros_like(x0)
-        else:
-            down_feat0 = self.downsample0(pan_out1)
-            p_concat_layer0 = torch.cat([down_feat0, fpn_out0], 1)
-            pan_out0 = self.Rep_n6(p_concat_layer0)  # P6
+        down_feat0 = self.downsample0(pan_out1)
+        p_concat_layer0 = torch.cat([down_feat0, fpn_out0], 1)
+        pan_out0 = self.Rep_n6(p_concat_layer0)  # P6
 
         outputs = [pan_out3, pan_out2, pan_out1, pan_out0]
         return outputs
@@ -1990,26 +1959,17 @@ class CSPRepBiFPANNeckSim_P6(nn.Module):
         f_concat_layer2 = self.Bifusion2([fpn_out2, x3, x4])
         pan_out3 = self.Rep_p3(f_concat_layer2) # P3
 
-        if self.inference_with_mask and self.masks[0] is None:
-            pan_out2 = torch.zeros_like(x2)
-        else:
-            down_feat2 = self.downsample2(pan_out3)
-            p_concat_layer2 = torch.cat([down_feat2, fpn_out2], 1)
-            pan_out2 = self.Rep_n4(p_concat_layer2) # P4
-        
-        if self.inference_with_mask and self.masks[1] is None:
-            pan_out1 = torch.zeros_like(x1)
-        else:
-            down_feat1 = self.downsample1(pan_out2)
-            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-            pan_out1 = self.Rep_n5(p_concat_layer1) # P5
+        down_feat2 = self.downsample2(pan_out3)
+        p_concat_layer2 = torch.cat([down_feat2, fpn_out2], 1)
+        pan_out2 = self.Rep_n4(p_concat_layer2) # P4
+    
+        down_feat1 = self.downsample1(pan_out2)
+        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
+        pan_out1 = self.Rep_n5(p_concat_layer1) # P5
 
-        if self.inference_with_mask and self.masks[2] is None:
-            pan_out0 = torch.zeros_like(x0)
-        else:
-            down_feat0 = self.downsample0(pan_out1)
-            p_concat_layer0 = torch.cat([down_feat0, fpn_out0], 1)
-            pan_out0 = self.Rep_n6(p_concat_layer0) # P6
+        down_feat0 = self.downsample0(pan_out1)
+        p_concat_layer0 = torch.cat([down_feat0, fpn_out0], 1)
+        pan_out0 = self.Rep_n6(p_concat_layer0) # P6
 
         outputs = [pan_out3, pan_out2, pan_out1, pan_out0]
 

@@ -3,7 +3,6 @@
 import math
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from yolov6.layers.common import *
 from yolov6.utils.torch_utils import initialize_weights
 from yolov6.models.efficientrep import *
@@ -22,8 +21,6 @@ class Model(nn.Module):
         # Build network
         num_layers = config.model.head.num_layers
         self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net)
-        self.detect.inference_with_mask = False
-        self.neck.inference_with_mask = False
         self.enable_gater_net = enable_gater_net
 
         # Init Detect head
@@ -51,43 +48,6 @@ class Model(nn.Module):
         else:
             x = self.detect(x, gating_decisions)
             return x, gating_decisions, None
-            
-    def forward1(self, x):
-        export_mode = torch.onnx.is_in_onnx_export()
-        x = self.backbone(x)
-        x = self.neck(x)
-        if export_mode == False:
-            featmaps = []
-            featmaps.extend(x)
-        x = self.detect(x)
-        return [x, None] if export_mode is True else [x, None, featmaps]
-
-    def prune_regions(self, x, source_mask, path):
-        CounterA.reset()
-        if not self.enable_gater_net:
-            x = self.backbone(x)
-            x = self.neck(x)
-        else:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
-            x = self.backbone(x, gating_decisions)
-            x = self.neck(x, gating_decisions)
-
-        mask = [None for _ in range(len(x))]
-        n_type = x[0].dtype
-        n_device = x[0].device
-
-        for i in range(min(len(source_mask), len(x))):
-            b, g, h, w = x[i].shape
-            original_mask_tensor = torch.tensor(source_mask[i], dtype=n_type, device=n_device)
-            interpolated_mask = F.interpolate(original_mask_tensor.unsqueeze(0).unsqueeze(0), size=(h, w), mode='nearest')
-            expanded_mask = interpolated_mask.expand(b, g, -1, -1)
-            
-            # Check if the tensor is all zeros. If it is, set the mask entry to None.
-            if not expanded_mask.eq(0).all():
-                mask[i] = expanded_mask
-
-        torch.save(mask, path + "/masks.pt")
-
 
     def _apply(self, fn):
         self = super()._apply(fn)
