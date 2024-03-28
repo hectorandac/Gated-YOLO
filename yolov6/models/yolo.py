@@ -21,7 +21,7 @@ class Model(nn.Module):
         super().__init__()
         # Build network
         num_layers = config.model.head.num_layers
-        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns)
+        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=self.enable_gater_net)
         self.detect.inference_with_mask = False
         self.neck.inference_with_mask = False
         self.enable_gater_net = enable_gater_net
@@ -109,7 +109,7 @@ def sort_key(layer_name):
         # Return a default value that keeps the layer in its original position
         return -1
 
-def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False):
+def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False, enable_gater_net=False):
     depth_mul = config.model.depth_multiple
     width_mul = config.model.width_multiple
     num_repeat_backbone = config.model.backbone.num_repeats
@@ -210,13 +210,15 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
     cumulativeGatesChannels = list(itertools.accumulate(sections))
     num_filters = sum(sections) if channels_list else 0
 
-    gater = GaterNetwork(
-        feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
-        num_features=204800,         # Number of output features from the feature extractor
-        num_filters=num_filters,
-        sections=cumulativeGatesChannels,
-        bottleneck_size=256,         # Size of the bottleneck in the GaterNetwork
-    )
+    gater = None
+    if enable_gater_net:
+        gater = GaterNetwork(
+            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
+            num_features=204800,         # Number of output features from the feature extractor
+            num_filters=num_filters,
+            sections=cumulativeGatesChannels,
+            bottleneck_size=256,         # Size of the bottleneck in the GaterNetwork
+        )
 
     return backbone, neck, head, gater
 
