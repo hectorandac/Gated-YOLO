@@ -204,7 +204,6 @@ class Detect(nn.Module):
                     if self.use_dfl:
                         reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)
                         reg_output = self.proj_conv(F.softmax(reg_output, dim=1))
-                            
 
                     cls_output = torch.sigmoid(cls_output)
 
