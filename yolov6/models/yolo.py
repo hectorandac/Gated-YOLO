@@ -21,7 +21,7 @@ class Model(nn.Module):
         super().__init__()
         # Build network
         num_layers = config.model.head.num_layers
-        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=self.enable_gater_net)
+        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net)
         self.detect.inference_with_mask = False
         self.neck.inference_with_mask = False
         self.enable_gater_net = enable_gater_net
