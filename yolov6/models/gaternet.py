@@ -11,12 +11,12 @@ class GaterNetwork(nn.Module):
         self.feature_extractor = feature_extractor_arch(pretrained=False)
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((20, 20))
-        self.fc1 = nn.Linear(num_features, bottleneck_size)
-        self.fc2 = nn.Linear(bottleneck_size, num_filters)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((2, 2))
+        self.fc1 = nn.Linear(8192, 4096)
+        self.fc2 = nn.Linear(4096, num_filters)
         
         # Batch Normalization
-        self.batch_norm = nn.BatchNorm1d(bottleneck_size)
+        self.batch_norm = nn.BatchNorm1d(4096)
         self.sections = sections
 
         self.enable_fixed_gates = False # default 
@@ -62,7 +62,7 @@ class GaterNetwork(nn.Module):
     @staticmethod
     def create_feature_extractor_resnet18(pretrained=True):
         # For example, use ResNet18 as the base model
-        model = models.resnet18(pretrained=pretrained)
+        model = models.resnet101(pretrained=pretrained)
         # Remove the final fully connected layer (classifier)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
         return feature_extractor

@@ -182,29 +182,28 @@ class Detect(nn.Module):
                     reg_feat = self.reg_convs[i](reg_x, gating_decisions)
 
                     a = gating_decisions[CounterA.add_1()]
-                    if a[0] is None:
-                        cls_output = torch.zeros(a[1], device=device)
-                    else:
-                        uu = self.cls_preds[i](cls_feat)
-                        a[1] = uu.shape
-                        cls_output = uu * a[0]
+                    #if a[0] is None:
+                    #    cls_output = torch.zeros(a[1], device=device)
+                    #else:
+                    #    uu = self.cls_preds[i](cls_feat)
+                    #    a[1] = uu.shape
+                    #    cls_output = uu * a[0]
 
                     c = gating_decisions[CounterA.add_1()]
-                    if c[0] is None:
-                        reg_output = torch.zeros(c[1], device=device)
-                    else:
-                        d = self.reg_preds[i](reg_feat)
-                        c[1] = d.shape
-                        reg_output = d * c[0]
+                    #if c[0] is None:
+                    #    reg_output = torch.zeros(c[1], device=device)
+                    #else:
+                    #    d = self.reg_preds[i](reg_feat)
+                    #    c[1] = d.shape
+                    #    reg_output = d * c[0]
+                    
+                    # Disabling gates from the heads, in practice they are always active
+                    cls_output = self.cls_preds[i](cls_feat)
+                    reg_output = self.reg_preds[i](reg_feat)
 
                     if self.use_dfl:
                         reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)
-                        if dfl_gates[0] is None:
-                            reg_output = torch.zeros(dfl_gates[1], device=device)
-                        else:
-                            e = self.proj_conv(F.softmax(reg_output, dim=1))
-                            dfl_gates[1] = e.shape
-                            reg_output = e * dfl_gates[0]
+                        reg_output = self.proj_conv(F.softmax(reg_output, dim=1))
                             
 
                     cls_output = torch.sigmoid(cls_output)
