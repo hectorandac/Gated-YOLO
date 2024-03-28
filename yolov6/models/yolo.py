@@ -9,6 +9,8 @@ from yolov6.models.efficientrep import *
 from yolov6.models.reppan import *
 from yolov6.utils.events import LOGGER
 
+start_bold = "\033[1m"
+end_bold = "\033[0m"
 
 class Model(nn.Module):
     export = False
@@ -161,11 +163,9 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
         if ("conv.weight" in layer_name and "rbr_dense" not in layer_name and "rbr_1x1.conv.weight" not in layer_name) or ("rbr_1x1.bn.weight" in layer_name) or ("upsample_transpose.weight" in layer_name) or ("reg_preds" in layer_name and "weight" in layer_name) or ("cls_preds" in layer_name and "weight" in layer_name):
             num_gates = combined_dict[layer_name].shape[0]
             sections.append(num_gates)
-            print(f"✅ GATING: {layer_name} with Channels -> {num_gates}")
-        else:
-            print(f"❌ NOT GATING: {layer_name} with Channels -> {combined_dict[layer_name].shape}")
+            print(f"✅ GATING: {start_bold}{layer_name:<50}{end_bold} Channels -> {num_gates}")
 
-    print(f"Gate-able Layer's count {len(sections)} with total of {sum(sections)} Gates")
+    print(f"\nGate-able Layer's count {start_bold}{len(sections)}{end_bold} with total of {start_bold}{sum(sections)}{end_bold} Gates\n")
 
     cumulativeGatesChannels = list(itertools.accumulate(sections))
     num_filters = sum(sections) if channels_list else 0

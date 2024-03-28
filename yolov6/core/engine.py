@@ -88,7 +88,6 @@ class Trainer:
                 self.cfg.data_aug.mosaic = 0.0
                 self.cfg.data_aug.mixup = 0.0
 
-
         self.train_loader, self.val_loader = self.get_data_loader(self, self.args, self.cfg, self.data_dict)
 
         self.model = self.parallel_model(args, model, device)
@@ -111,7 +110,7 @@ class Trainer:
         self.fixed_gates = args.fixed_gates
 
         ddp_mode = device.type != 'cpu' and args.rank != -1
-
+        
         if ddp_mode:
             self.model.module.neck.enable_gater_net = args.enable_gater_net
             self.model.module.neck.enable_fixed_gates = args.enable_fixed_gates
@@ -121,9 +120,10 @@ class Trainer:
             self.model.module.backbone.enable_fixed_gates = args.enable_fixed_gates
             self.model.module.backbone.fixed_gates = args.fixed_gates
 
-            self.model.module.gater.enable_gater_net = args.enable_gater_net
-            self.model.module.gater.enable_fixed_gates = args.enable_fixed_gates
-            self.model.module.gater.fixed_gates = args.fixed_gates
+            if self.enable_gater_net:
+                self.model.module.gater.enable_gater_net = args.enable_gater_net
+                self.model.module.gater.enable_fixed_gates = args.enable_fixed_gates
+                self.model.module.gater.fixed_gates = args.fixed_gates
         else:
             self.model.neck.enable_gater_net = args.enable_gater_net
             self.model.neck.enable_fixed_gates = args.enable_fixed_gates
@@ -133,9 +133,10 @@ class Trainer:
             self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
             self.model.backbone.fixed_gates = args.fixed_gates
 
-            self.model.gater.enable_gater_net = args.enable_gater_net
-            self.model.gater.enable_fixed_gates = args.enable_fixed_gates
-            self.model.gater.fixed_gates = args.fixed_gates
+            if self.enable_gater_net:
+                self.model.gater.enable_gater_net = args.enable_gater_net
+                self.model.gater.enable_fixed_gates = args.enable_fixed_gates
+                self.model.gater.fixed_gates = args.fixed_gates
 
         self.loss_num = 4 if args.enable_gater_net else 3
         self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
@@ -459,8 +460,7 @@ class Trainer:
                 download_ckpt(weights)
             LOGGER.info(f'Loading state_dict from {weights} for fine-tuning...')
             model = load_state_dict(weights, model, map_location=device)
-
-        LOGGER.info('Model: {}'.format(model))
+            
         return model
 
     def get_teacher_model(self, args, cfg, nc, device):

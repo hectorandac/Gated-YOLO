@@ -16,9 +16,6 @@ def load_state_dict(weights, model, map_location=None):
     model.load_state_dict(state_dict, strict=False)
     del ckpt, state_dict, model_state_dict
     return model
-
-
-def load_state_dict2(weights, model, map_location=None):
     """Load weights from checkpoint file, only assign weights those layers' name and shape are match."""
     decision_gates = torch.load('./runs/inference/exp51/gates.pt')
     ckpt = torch.load(weights, map_location=map_location)
@@ -71,10 +68,10 @@ def load_state_dict2(weights, model, map_location=None):
                 shape_mismatch_keys.append(k)
 
     # Print the keys with shape mismatch
-    # if shape_mismatch_keys:
-        #print("Shape mismatches found for the following keys:")
-        # for key in shape_mismatch_keys:
-            #print(f"Layer: {key}, loaded shape: {state_dict[key].shape}, model shape: {model_state_dict[key].shape}")
+    if shape_mismatch_keys:
+        print("Shape mismatches found for the following keys:")
+        for key in shape_mismatch_keys:
+            print(f"Layer: {key}, loaded shape: {state_dict[key].shape}, model shape: {model_state_dict[key].shape}")
 
     model.load_state_dict(new_state_dict, strict=False)
     del ckpt, state_dict, model_state_dict
