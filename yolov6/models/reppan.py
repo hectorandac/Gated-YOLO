@@ -260,114 +260,6 @@ class RepBiFPANNeck(nn.Module):
         outputs = [pan_out2, pan_out1, pan_out0]
 
         return outputs
-    
-class RepBiFPANNeck1(nn.Module):
-    """RepBiFPANNeck Module
-    """
-    # [64, 128, 256, 512, 1024]
-    # [256, 128, 128, 256, 256, 512]
-
-    def __init__(
-        self,
-        channels_list=None,
-        num_repeats=None,
-        block=RepVGGBlock
-    ):
-        super().__init__()
-
-        assert channels_list is not None
-        assert num_repeats is not None
-
-        self.reduce_layer0 = ConvBNReLU(
-            in_channels=channels_list[4], # 1024
-            out_channels=channels_list[5], # 256
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion0 = BiFusion(
-            in_channels=[channels_list[3], channels_list[2]], # 512, 256
-            out_channels=channels_list[5], # 256
-        )
-        self.Rep_p4 = RepBlock(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[5], # 256
-            n=num_repeats[5],
-            block=block
-        )
-
-        self.reduce_layer1 = ConvBNReLU(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[6], # 128
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion1 = BiFusion(
-            in_channels=[channels_list[2], channels_list[1]], # 256, 128
-            out_channels=channels_list[6], # 128
-        )
-
-        self.Rep_p3 = RepBlock(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[6], # 128
-            n=num_repeats[6],
-            block=block
-        )
-
-        self.downsample2 = ConvBNReLU(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[7], # 128
-            kernel_size=3,
-            stride=2
-        )
-
-        self.Rep_n3 = RepBlock(
-            in_channels=channels_list[6] + channels_list[7], # 128 + 128
-            out_channels=channels_list[8], # 256
-            n=num_repeats[7],
-            block=block
-        )
-
-        self.downsample1 = ConvBNReLU(
-            in_channels=channels_list[8], # 256
-            out_channels=channels_list[9], # 256
-            kernel_size=3,
-            stride=2
-        )
-
-        self.Rep_n4 = RepBlock(
-            in_channels=channels_list[5] + channels_list[9], # 256 + 256
-            out_channels=channels_list[10], # 512
-            n=num_repeats[8],
-            block=block
-        )
-
-
-    def forward(self, input):
-
-        (x3, x2, x1, x0) = input
-
-        fpn_out0 = self.reduce_layer0(x0)
-        f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
-        f_out0 = self.Rep_p4(f_concat_layer0)
-
-        fpn_out1 = self.reduce_layer1(f_out0)
-        f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-        pan_out2 = self.Rep_p3(f_concat_layer1)
-
-        down_feat1 = self.downsample2(pan_out2)
-        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-        pan_out1 = self.Rep_n3(p_concat_layer1)
-
-        down_feat0 = self.downsample1(pan_out1)
-        p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-        pan_out0 = self.Rep_n4(p_concat_layer2)
-
-        outputs = [pan_out2, pan_out1, pan_out0]
-
-        return outputs
-
 
 class RepPANNeck6(nn.Module):
     """RepPANNeck+P6 Module
@@ -522,7 +414,6 @@ class RepPANNeck6(nn.Module):
 
         return outputs
 
-
 class RepBiFPANNeck6(nn.Module):
     """RepBiFPANNeck_P6 Module
     """
@@ -672,7 +563,6 @@ class RepBiFPANNeck6(nn.Module):
 
         return outputs
 
-
 class CSPRepPANNeck(nn.Module):
     """
     CSPRepPANNeck module.
@@ -794,131 +684,9 @@ class CSPRepPANNeck(nn.Module):
 
         return outputs
 
-
-class CSPRepBiFPANNeck1(nn.Module):
-    """
-    CSPRepBiFPANNeck module.
-    """
-
-    def __init__(
-        self,
-        channels_list=None,
-        num_repeats=None,
-        block=BottleRep,
-        csp_e=float(1)/2,
-        stage_block_type="BepC3"
-    ):
-        super().__init__()
-
-        assert channels_list is not None
-        assert num_repeats is not None
-
-        if stage_block_type == "BepC3":
-            stage_block = BepC3
-        elif stage_block_type == "MBLABlock":
-            stage_block = MBLABlock
-        else:
-            raise NotImplementedError
-
-        self.reduce_layer0 = ConvBNReLU(
-            in_channels=channels_list[4], # 1024
-            out_channels=channels_list[5], # 256
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion0 = BiFusion(
-            in_channels=[channels_list[3], channels_list[2]], # 512, 256
-            out_channels=channels_list[5], # 256
-        )
-
-        self.Rep_p4 = stage_block(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[5], # 256
-            n=num_repeats[5],
-            e=csp_e,
-            block=block
-        )
-
-        self.reduce_layer1 = ConvBNReLU(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[6], # 128
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion1 = BiFusion(
-            in_channels=[channels_list[2], channels_list[1]], # 256, 128
-            out_channels=channels_list[6], # 128
-        )
-
-        self.Rep_p3 = stage_block(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[6], # 128
-            n=num_repeats[6],
-            e=csp_e,
-            block=block
-        )
-
-        self.downsample2 = ConvBNReLU(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[7], # 128
-            kernel_size=3,
-            stride=2
-        )
-
-        self.Rep_n3 = stage_block(
-            in_channels=channels_list[6] + channels_list[7], # 128 + 128
-            out_channels=channels_list[8], # 256
-            n=num_repeats[7],
-            e=csp_e,
-            block=block
-        )
-
-        self.downsample1 = ConvBNReLU(
-            in_channels=channels_list[8], # 256
-            out_channels=channels_list[9], # 256
-            kernel_size=3,
-            stride=2
-        )
-
-
-        self.Rep_n4 = stage_block(
-            in_channels=channels_list[5] + channels_list[9], # 256 + 256
-            out_channels=channels_list[10], # 512
-            n=num_repeats[8],
-            e=csp_e,
-            block=block
-        )
-
-
-    def forward(self, input):
-
-        (x3, x2, x1, x0) = input
-
-        fpn_out0 = self.reduce_layer0(x0)
-        f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
-        f_out0 = self.Rep_p4(f_concat_layer0)
-
-        fpn_out1 = self.reduce_layer1(f_out0)
-        f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-        pan_out2 = self.Rep_p3(f_concat_layer1)
-
-        down_feat1 = self.downsample2(pan_out2)
-        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-        pan_out1 = self.Rep_n3(p_concat_layer1)
-
-        down_feat0 = self.downsample1(pan_out1)
-        p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-        pan_out0 = self.Rep_n4(p_concat_layer2)
-
-        outputs = [pan_out2, pan_out1, pan_out0]
-
-        return outputs
-
 class CSPRepBiFPANNeck(nn.Module):
     """
-    GatedCSPRepBiFPANNeck module.
+    CSPRepBiFPANNeck module.
     """
 
     def __init__(
@@ -1023,148 +791,6 @@ class CSPRepBiFPANNeck(nn.Module):
             f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
             f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions) 
 
-            fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
-            f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
-            pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
-
-            down_feat1 = self.downsample2(pan_out2, gating_decisions)
-            p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-            pan_out1 = self.Rep_n3(p_concat_layer1, gating_decisions)
-
-            down_feat0 = self.downsample1(pan_out1, gating_decisions)
-            p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-            pan_out0 = self.Rep_n4(p_concat_layer2, gating_decisions)
-
-            outputs = [pan_out2, pan_out1, pan_out0]
-
-            return outputs
-
-        fpn_out0 = self.reduce_layer0(x0)
-        f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2])
-        f_out0 = self.Rep_p4(f_concat_layer0)
-
-        fpn_out1 = self.reduce_layer1(f_out0)
-        f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3])
-        pan_out2 = self.Rep_p3(f_concat_layer1)
-
-        down_feat1 = self.downsample2(pan_out2)
-        p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
-        pan_out1 = self.Rep_n3(p_concat_layer1)
-
-        down_feat0 = self.downsample1(pan_out1)
-        p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
-        pan_out0 = self.Rep_n4(p_concat_layer2)
-
-        outputs = [pan_out2, pan_out1, pan_out0]
-
-        return outputs
-
-class GatedCSPRepBiFPANNeck(nn.Module):
-    """
-    GatedCSPRepBiFPANNeck module.
-    """
-
-    def __init__(
-        self,
-        channels_list=None,
-        num_repeats=None,
-        block=BottleRep,
-        csp_e=float(1)/2,
-        stage_block_type="BepC3"
-    ):
-        super().__init__()
-
-        assert channels_list is not None
-        assert num_repeats is not None
-        self.channels_list = channels_list
-
-        if stage_block_type == "BepC3":
-            stage_block = BepC3
-        elif stage_block_type == "MBLABlock":
-            stage_block = MBLABlock
-        else:
-            raise NotImplementedError
-
-        self.reduce_layer0 = ConvBNReLU(
-            in_channels=channels_list[4], # 1024
-            out_channels=channels_list[5], # 256
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion0 = BiFusion(
-            in_channels=[channels_list[3], channels_list[2]], # 512, 256
-            out_channels=channels_list[5], # 256
-        )
-
-        self.Rep_p4 = stage_block(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[5], # 256
-            n=num_repeats[5],
-            e=csp_e,
-            block=block
-        )
-
-        self.reduce_layer1 = ConvBNReLU(
-            in_channels=channels_list[5], # 256
-            out_channels=channels_list[6], # 128
-            kernel_size=1,
-            stride=1
-        )
-
-        self.Bifusion1 = BiFusion(
-            in_channels=[channels_list[2], channels_list[1]], # 256, 128
-            out_channels=channels_list[6], # 128
-        )
-
-        self.Rep_p3 = stage_block(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[6], # 128
-            n=num_repeats[6],
-            e=csp_e,
-            block=block
-        )
-
-        self.downsample2 = ConvBNReLU(
-            in_channels=channels_list[6], # 128
-            out_channels=channels_list[7], # 128
-            kernel_size=3,
-            stride=2
-        )
-
-        self.Rep_n3 = stage_block(
-            in_channels=channels_list[6] + channels_list[7], # 128 + 128
-            out_channels=channels_list[8], # 256
-            n=num_repeats[7],
-            e=csp_e,
-            block=block
-        )
-
-        self.downsample1 = ConvBNReLU(
-            in_channels=channels_list[8], # 256
-            out_channels=channels_list[9], # 256
-            kernel_size=3,
-            stride=2
-        )
-
-
-        self.Rep_n4 = stage_block(
-            in_channels=channels_list[5] + channels_list[9], # 256 + 256
-            out_channels=channels_list[10], # 512
-            n=num_repeats[8],
-            e=csp_e,
-            block=block
-        )
-
-
-    def forward(self, input, gating_decisions = None):
-        (x3, x2, x1, x0) = input
-
-        if gating_decisions != None:
-            fpn_out0 = self.reduce_layer0(x0, gating_decisions)
-            f_concat_layer0 = self.Bifusion0([fpn_out0, x1, x2], gating_decisions)
-            f_out0 = self.Rep_p4(f_concat_layer0, gating_decisions)
-            
             fpn_out1 = self.reduce_layer1(f_out0, gating_decisions)
             f_concat_layer1 = self.Bifusion1([fpn_out1, x2, x3], gating_decisions)
             pan_out2 = self.Rep_p3(f_concat_layer1, gating_decisions)
@@ -1367,7 +993,6 @@ class CSPRepPANNeck_P6(nn.Module):
 
         return outputs
 
-
 class CSPRepBiFPANNeck_P6(nn.Module):
     """CSPRepBiFPANNeck_P6 Module
     """
@@ -1549,7 +1174,6 @@ class CSPRepBiFPANNeck_P6(nn.Module):
 
         return outputs
 
-
 class Lite_EffiNeck(nn.Module):
 
     def __init__(
@@ -1659,7 +1283,6 @@ class Lite_EffiNeck(nn.Module):
         outputs = [pan_out3, pan_out2, pan_out1, pan_out0]
 
         return outputs
-
 
 ## Simplified versions
 
@@ -1810,7 +1433,6 @@ class RepBiFPANNeck6Sim(nn.Module):
 
         outputs = [pan_out3, pan_out2, pan_out1, pan_out0]
         return outputs
-
 
 class CSPRepBiFPANNeckSim_P6(nn.Module):
     """CSPRepBiFPANNeck_P6 Module
