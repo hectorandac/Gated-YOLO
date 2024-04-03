@@ -202,7 +202,7 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1.0, gates) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1.5, gates) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size

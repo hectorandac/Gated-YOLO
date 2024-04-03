@@ -159,8 +159,12 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
 
     combined_dict = {**backbone_dict, **neck_dict, **sorted_head_dict}
 
+    ignore_gates_for = ["proj_conv.weight", "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight", "cls_preds.0.weight", "reg_preds.0.weight",
+        "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight", "cls_preds.1.weight", "reg_preds.1.weight", "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight",
+        "reg_convs.2.block.conv.weight", "cls_preds.2.weight", "reg_preds.2.weight"]
+
     for layer_name in combined_dict:
-        if ("conv.weight" in layer_name and "rbr_dense" not in layer_name and "rbr_1x1.conv.weight" not in layer_name) or ("rbr_1x1.bn.weight" in layer_name) or ("upsample_transpose.weight" in layer_name) or ("reg_preds" in layer_name and "weight" in layer_name) or ("cls_preds" in layer_name and "weight" in layer_name):
+        if (layer_name not in ignore_gates_for) and ("conv.weight" in layer_name and "rbr_dense" not in layer_name and "rbr_1x1.conv.weight" not in layer_name) or ("rbr_1x1.bn.weight" in layer_name) or ("upsample_transpose.weight" in layer_name):
             num_gates = combined_dict[layer_name].shape[0]
             sections.append(num_gates)
             print(f"✅ GATING: {start_bold}{layer_name:<50}{end_bold} Channels -> {num_gates}")

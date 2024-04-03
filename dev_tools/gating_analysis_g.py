@@ -4,7 +4,7 @@ import numpy as np
 
 
 # Assuming gating_decisions is loaded from a file as before
-gating_decisions = torch.load('runs/inference/exp47/gates.pt')
+gating_decisions = torch.load('runs/inference/exp11/gates.pt')
 
 # New approach to analyze and collect specific gates
 specific_gate_analysis = []
