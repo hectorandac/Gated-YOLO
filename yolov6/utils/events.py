@@ -16,7 +16,7 @@ def set_logging(name=None):
 
 
 LOGGER = set_logging(__name__)
-NCOLS = min(100, shutil.get_terminal_size().columns)
+NCOLS = min(200, shutil.get_terminal_size().columns)
 
 
 def load_yaml(file_path):
@@ -79,6 +79,7 @@ def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
 
     if len(losses) >= 4:
         tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
+        tblogger.add_scalar("train/dvt_loss", losses[4], epoch + 1)
         percentage_open_gates = [calculate_open_gates_percentage(layer_gates) for layer_gates in gates]
         save_proportions_to_file(percentage_open_gates)
         tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1, bins=100)

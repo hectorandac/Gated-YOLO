@@ -138,8 +138,8 @@ class Trainer:
                 self.model.gater.enable_fixed_gates = args.enable_fixed_gates
                 self.model.gater.fixed_gates = args.fixed_gates
 
-        self.loss_num = 4 if args.enable_gater_net else 3
-        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
+        self.loss_num = 5 if args.enable_gater_net else 3
+        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss', 'dvt_loss'] if args.enable_gater_net else [])
 
         if self.args.distill:
             self.loss_num += 1
@@ -202,7 +202,7 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1.5, gates) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1, gates) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size
