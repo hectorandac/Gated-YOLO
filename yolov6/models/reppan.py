@@ -1,7 +1,5 @@
 import torch
 from torch import nn
-from yolov6.models.gaternet import GaterNetwork
-import itertools
 from yolov6.layers.common import RepBlock, RepVGGBlock, BottleRep, BepC3, ConvBNReLU, Transpose, BiFusion, \
                                 MBLABlock, ConvBNHS, CSPBlock, DPBlock
 

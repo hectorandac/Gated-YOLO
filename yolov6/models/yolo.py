@@ -8,6 +8,8 @@ from yolov6.utils.torch_utils import initialize_weights
 from yolov6.models.efficientrep import *
 from yolov6.models.reppan import *
 from yolov6.utils.events import LOGGER
+from yolov6.models.gaternet import GaterNetwork
+import itertools
 
 start_bold = "\033[1m"
 end_bold = "\033[0m"
@@ -177,7 +179,7 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
     gater = None
     if enable_gater_net:
         gater = GaterNetwork(
-            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
+            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet101,
             num_features=204800,         # Number of output features from the feature extractor
             num_filters=num_filters,
             sections=cumulativeGatesChannels,

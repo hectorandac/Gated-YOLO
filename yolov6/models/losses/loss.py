@@ -201,41 +201,10 @@ class ComputeLoss:
 
                 class_to_gates_mapping_per_image.append(class_to_gates)
 
-            all_gates = [gate for image_map in class_to_gates_mapping_per_image for gates_list in image_map.values() for gate in gates_list]
-            gate_counts = Counter(all_gates)
-
-            common_gates = [gate for gate, count in gate_counts.items() if count > 8] 
-
-            # Example values for illustration
-            lambda_common_gate_penalty = 0.01  # Penalty scaling factor
-
-            # Convert common_gates to a tensor for efficient operations
-            common_gates_tensor = torch.tensor(common_gates, dtype=torch.long, device='cuda:0')
-
-            # Calculate the penalty for each image based on its gating decisions
-            gate_penalty_per_image = []
-            for i in range(g_reconstructed.shape[0]):  # Loop through each image in the batch
-                # Get the gating decision for this image
-                image_gating_decision = g_reconstructed[i]
-                
-                # Check if each common gate is active in this image's gating decision
-                active_common_gates = image_gating_decision[common_gates_tensor]
-                
-                # Sum the activations to get the penalty for this image
-                # Assuming binary activation (1 for active, 0 for inactive)
-                image_gate_penalty = active_common_gates.sum() * lambda_common_gate_penalty
-                
-                gate_penalty_per_image.append(image_gate_penalty)
-
-            # Aggregate penalties across the batch
-            total_gate_penalty = torch.stack(gate_penalty_per_image).sum() * 0.002
-
             gating_loss = g_reconstructed.mean(dim=1).mean()
             gating_loss = (gating_loss * lambda_reg) + (loss_cls * 0.5)
             loss += gating_loss
-            loss += total_gate_penalty
             loss_components.append(gating_loss.unsqueeze(0))
-            loss_components.append(total_gate_penalty.unsqueeze(0))
 
         return loss, torch.cat(loss_components).detach()
     

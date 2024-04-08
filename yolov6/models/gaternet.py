@@ -11,12 +11,14 @@ class GaterNetwork(nn.Module):
         self.feature_extractor = feature_extractor_arch(pretrained=False)
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((2, 2))
-        self.fc1 = nn.Linear(8192, 4096)
-        self.fc2 = nn.Linear(4096, num_filters)
-        
-        # Batch Normalization
-        self.batch_norm = nn.BatchNorm1d(4096)
+        self.fc1 = nn.Linear(2048, 1024)
+        self.bn1 = nn.BatchNorm1d(1024)
+        self.relu1 = nn.ReLU()
+
+        self.fc2 = nn.Linear(1024, num_filters)
+        self.bn2 = nn.BatchNorm1d(num_filters) 
+        self.relu2 = nn.ReLU()
+
         self.sections = sections
 
         self.enable_fixed_gates = False # default 
@@ -28,16 +30,17 @@ class GaterNetwork(nn.Module):
         CounterA.reset()
         # Feature extraction
         f = self.feature_extractor(x)
-        f = self.adaptive_pool(f)
         f = torch.flatten(f, 1)
         
         # Bottleneck mapping
         f0 = self.fc1(f)
-        f0 = self.batch_norm(f0)
-        f0 = F.relu(f0)
+        f0 = self.bn1(f0)
+        f0 = self.relu1(f0)
         
         # Real-valued vector before binarization
         g0 = self.fc2(f0)
+        g0 = self.bn2(g0)
+        g0 = self.relu2(g0)
         
         if training:
             ## SEM HASH
@@ -60,9 +63,17 @@ class GaterNetwork(nn.Module):
         return section_gates_list
     
     @staticmethod
-    def create_feature_extractor_resnet18(pretrained=True):
+    def create_feature_extractor_resnet101(pretrained=True):
         # For example, use ResNet18 as the base model
         model = models.resnet101(pretrained=pretrained)
+        # Remove the final fully connected layer (classifier)
+        feature_extractor = nn.Sequential(*list(model.children())[:-1])
+        return feature_extractor
+    
+    @staticmethod
+    def create_feature_extractor_resnet18(pretrained=True):
+        # For example, use ResNet18 as the base model
+        model = models.resnet18(pretrained=pretrained)
         # Remove the final fully connected layer (classifier)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
         return feature_extractor

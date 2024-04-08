@@ -1,8 +1,5 @@
 from pickle import FALSE
-import torch
 from torch import nn
-from yolov6.models.gaternet import GaterNetwork
-import itertools
 from yolov6.layers.common import BottleRep, RepVGGBlock, RepBlock, BepC3, SimSPPF, SPPF, SimCSPSPPF, CSPSPPF, ConvBNSiLU, \
                                 MBLABlock, ConvBNHS, Lite_EffiBlockS2, Lite_EffiBlockS1, GatingSequential
 
