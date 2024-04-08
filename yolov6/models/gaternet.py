@@ -11,11 +11,11 @@ class GaterNetwork(nn.Module):
         self.feature_extractor = feature_extractor_arch(pretrained=False)
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
-        self.fc1 = nn.Linear(2048, 1024)
-        self.bn1 = nn.BatchNorm1d(1024)
+        self.fc1 = nn.Linear(num_features, bottleneck_size)
+        self.bn1 = nn.BatchNorm1d(bottleneck_size)
         self.relu1 = nn.ReLU()
 
-        self.fc2 = nn.Linear(1024, num_filters)
+        self.fc2 = nn.Linear(bottleneck_size, num_filters)
         self.bn2 = nn.BatchNorm1d(num_filters) 
         self.relu2 = nn.ReLU()
 

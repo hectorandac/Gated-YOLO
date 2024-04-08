@@ -161,12 +161,23 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
 
     combined_dict = {**backbone_dict, **neck_dict, **sorted_head_dict}
 
-    ignore_gates_for = ["proj_conv.weight", "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight", "cls_preds.0.weight", "reg_preds.0.weight",
-        "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight", "cls_preds.1.weight", "reg_preds.1.weight", "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight",
-        "reg_convs.2.block.conv.weight", "cls_preds.2.weight", "reg_preds.2.weight"]
+    ignore_gates_for = [
+        "proj_conv.weight", "cls_preds.0.weight", "reg_preds.0.weight",
+        "cls_preds.1.weight", "reg_preds.1.weight", "cls_preds.2.weight", "reg_preds.2.weight",
+        "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight",
+        "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight",
+        "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight", "reg_convs.2.block.conv.weight"
+    ]
+
+    sections = []
 
     for layer_name in combined_dict:
-        if (layer_name not in ignore_gates_for) and ("conv.weight" in layer_name and "rbr_dense" not in layer_name and "rbr_1x1.conv.weight" not in layer_name) or ("rbr_1x1.bn.weight" in layer_name) or ("upsample_transpose.weight" in layer_name):
+        if layer_name in ignore_gates_for:
+            continue
+
+        includes = ("conv.weight", "rbr_1x1.bn.weight", "upsample_transpose.weight")
+        excludes = ("rbr_dense", "rbr_1x1.conv.weight")
+        if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes):
             num_gates = combined_dict[layer_name].shape[0]
             sections.append(num_gates)
             print(f"✅ GATING: {start_bold}{layer_name:<50}{end_bold} Channels -> {num_gates}")
@@ -180,10 +191,10 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
     if enable_gater_net:
         gater = GaterNetwork(
             feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet101,
-            num_features=204800,         # Number of output features from the feature extractor
+            num_features=2048,
+            bottleneck_size=512,
             num_filters=num_filters,
             sections=cumulativeGatesChannels,
-            bottleneck_size=256,         # Size of the bottleneck in the GaterNetwork
         )
 
     return backbone, neck, head, gater
