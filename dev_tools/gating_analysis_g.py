@@ -1,12 +1,14 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
 
+parser = argparse.ArgumentParser(description='Analyze and visualize gating decisions.')
+parser.add_argument('path', type=str, help='Path to the .pt file containing gating decisions.')
+args = parser.parse_args()
 
-# Assuming gating_decisions is loaded from a file as before
-gating_decisions = torch.load('runs/inference/exp11/gates.pt')
+gating_decisions = torch.load(args.path)
 
-# New approach to analyze and collect specific gates
 specific_gate_analysis = []
 for i, section_gates in enumerate(gating_decisions):
     if section_gates[0] is None:
@@ -16,48 +18,42 @@ for i, section_gates in enumerate(gating_decisions):
     section_gates_float = section_gates[0].float()
     gating_frequency = section_gates_float.mean(dim=0).cpu()
     
-    # Identify specific gates
     completely_off_indices = torch.where(gating_frequency == 0)[0].tolist()
     always_on_indices = torch.where(gating_frequency == 1)[0].tolist()
-    
-    # Store the specific gate indices
+    partially_active_indices = torch.where((gating_frequency > 0) & (gating_frequency < 1))[0].tolist()
+
     specific_gate_analysis.append({
         'layer': i+1,
         'completely_off': completely_off_indices,
-        'always_on': always_on_indices
+        'always_on': always_on_indices,
+        'partially_active': partially_active_indices
     })
 
-# Print specific gates for each layer
 for analysis in specific_gate_analysis:
     layer = analysis['layer']
     if 'status' in analysis and analysis['status'] == 'blocked':
-        print(f"Layer {layer}: Blocked")
+        print(f"Layer {layer}:\nBlocked")
     else:
         off_gates = ', '.join(map(str, analysis['completely_off']))
         on_gates = ', '.join(map(str, analysis['always_on']))
-        print(f"Layer {layer}: Completely Off Gates: [{off_gates}], Always On Gates: [{on_gates}]")
+        partial_gates = ', '.join(map(str, analysis['partially_active']))
+        print(f"Layer {layer}:\nCompletely Off Gates: [{off_gates}]\nAlways On Gates: [{on_gates}]\nPartially active: [{partial_gates}]")
 
 
-# Assuming specific_gate_analysis contains your detailed gate analysis as before
 num_layers = max([a['layer'] for a in specific_gate_analysis])
 num_gates = max([max(a['always_on'] + a['completely_off'], default=0) for a in specific_gate_analysis if 'status' not in a], default=0) + 1
-
-# Initialize a matrix to represent the gate status across all layers
-# We'll use 0 for off, 1 for on, and 0.5 for gates not consistently on or off
 gate_status_matrix = np.full((num_layers, num_gates), 0.5)
 
 for analysis in specific_gate_analysis:
-    layer_idx = analysis['layer'] - 1  # Adjusting for 0-based indexing
+    layer_idx = analysis['layer'] - 1
     if 'status' in analysis and analysis['status'] == 'blocked':
-        # Optional: Mark blocked layers differently, e.g., with a specific color
-        gate_status_matrix[layer_idx, :] = 0.5  # Assuming grey for blocked/not consistent
+        gate_status_matrix[layer_idx, :] = 0.5
     else:
-        # Mark always on gates
         for gate in analysis['always_on']:
-            gate_status_matrix[layer_idx, gate] = 1  # Green for always on
-        # Mark always off gates
+            gate_status_matrix[layer_idx, gate] = 1
+        
         for gate in analysis['completely_off']:
-            gate_status_matrix[layer_idx, gate] = 0  # Red for always off
+            gate_status_matrix[layer_idx, gate] = 0
 
 # Plotting the gate status matrix
 plt.figure(figsize=(12, 8))
