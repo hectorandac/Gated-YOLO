@@ -190,9 +190,9 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
     gater = None
     if enable_gater_net:
         gater = GaterNetwork(
-            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet101,
-            num_features=2048,
-            bottleneck_size=512,
+            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
+            num_features=512,
+            bottleneck_size=256,
             num_filters=num_filters,
             sections=cumulativeGatesChannels,
         )
