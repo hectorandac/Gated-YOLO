@@ -7,4 +7,3 @@ addict>=2.4.0
 pycocotools==2.0.0
 requests
 thop
-pytorch_quantization>=2.1.1
