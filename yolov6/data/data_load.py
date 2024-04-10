@@ -32,7 +32,8 @@ def create_dataloader(
     height=1088,
     width=1920,
     strides=None,
-):
+    cache_ram=False
+    ):
     """Create general dataloader.
 
     Returns dataloader and dataset
@@ -61,6 +62,7 @@ def create_dataloader(
             height=height,
             width=width,
             strides=strides,
+            cache_ram=cache_ram
         )
 
     batch_size = min(batch_size, len(dataset))

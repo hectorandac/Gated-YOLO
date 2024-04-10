@@ -367,6 +367,7 @@ class Trainer:
         if self.epoch == self.max_epoch - self.args.stop_aug_last_n_epoch:
             self.cfg.data_aug.mosaic = 0.0
             self.cfg.data_aug.mixup = 0.0
+            self.args.cache_ram = False # disable cache ram when stop strong augmentation.
             self.train_loader, self.val_loader = self.get_data_loader(self, self.args, self.cfg, self.data_dict)
         self.model.train()
         if self.rank != -1:
@@ -428,7 +429,8 @@ class Trainer:
                                          hyp=dict(cfg.data_aug), augment=True, rect=args.rect, rank=args.local_rank,
                                          workers=args.workers, shuffle=True, check_images=args.check_images,
                                          check_labels=args.check_labels, data_dict=data_dict, task='train',
-                                         specific_shape=args.specific_shape, height=args.height, width=args.width, strides=cfg.model.head.strides)[0]
+                                         specific_shape=args.specific_shape, height=args.height, width=args.width,
+                                         strides=cfg.model.head.strides, cache_ram=args.cache_ram)[0]
         # create val dataloader
         val_loader = None
         if args.rank in [-1, 0]:
@@ -437,7 +439,8 @@ class Trainer:
                                            hyp=dict(cfg.data_aug), rect=True, rank=-1, pad=0.5,
                                            workers=args.workers, check_images=args.check_images,
                                            check_labels=args.check_labels, data_dict=data_dict, task='val',
-                                           specific_shape=args.specific_shape, height=args.height, width=args.width, strides=cfg.model.head.strides)[0]
+                                           specific_shape=args.specific_shape, height=args.height, width=args.width,
+                                           strides=cfg.model.head.strides, cache_ram=args.cache_ram)[0]
 
         return train_loader, val_loader
 
