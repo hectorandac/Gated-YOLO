@@ -37,7 +37,7 @@ class Model(nn.Module):
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
         if self.enable_gater_net:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
+            gating_decisions = self.gater(x, training=self.training, epsilon=1.0)
         else:
             gating_decisions = None
         

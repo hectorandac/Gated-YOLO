@@ -58,16 +58,6 @@ def save_proportions_to_file(proportions, filename='gate_proportions.csv'):
         writer = csv.writer(file)
         writer.writerow(proportions)
 
-#def load_proportions_from_file(filename='gate_proportions.csv'):
-#    proportions = []
-#    with open(filename, newline='') as file:
-#        reader = csv.reader(file)
-#        for row in reader:
-#            proportions.append([float(val) for val in row])
-#    return proportions
-
-#data_over_time = load_proportions_from_file()
-
 def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
     """Display mAP and loss information to log."""
     tblogger.add_scalar("val/mAP@0.5", results[0], epoch + 1)
