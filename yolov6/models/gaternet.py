@@ -4,9 +4,13 @@ import torch.nn.functional as F
 import torchvision.models as models
 from yolov6.layers.common import CounterA
 
-class GatesGenerator(nn.Module):
-    def __init__(self, num_features, num_filters, bottleneck_size):
+class ExtractorGenerator(nn.Module):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, bottleneck_size):
         super().__init__()
+
+        # Feature extractor (E)
+        self.feature_extractor = feature_extractor_arch(pretrained=False)
+
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.fc1 = nn.Linear(num_features, bottleneck_size)
         self.bn1 = nn.LayerNorm(bottleneck_size)
@@ -15,8 +19,12 @@ class GatesGenerator(nn.Module):
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
 
     def forward(self, x):
+        # Feature extraction
+        f = self.feature_extractor(x)
+        f = torch.flatten(f, 1)
+        
         # Bottleneck mapping
-        f0 = self.fc1(x)
+        f0 = self.fc1(f)
         f0 = self.bn1(f0)
         f0 = self.relu1(f0)
         
@@ -35,10 +43,9 @@ class GaterNetwork(nn.Module):
         self.initial_categorizer = models.resnet101(pretrained=True)
         self.initial_categorizer = nn.Sequential(*list(self.initial_categorizer.children())[:-1])
         self.fc_categorizer = nn.Linear(2048, self.subgroups)
-        
-        self.feature_extractor = feature_extractor_arch(pretrained=False)
+
         self.subgroups_network = nn.ModuleList([
-            GatesGenerator(num_features, num_filters, bottleneck_size) for _ in range(self.subgroups)
+            ExtractorGenerator(feature_extractor_arch, num_features, num_filters, bottleneck_size) for _ in range(self.subgroups)
         ])
 
     def forward(self, x, training=False, epsilon=None):
@@ -47,6 +54,7 @@ class GaterNetwork(nn.Module):
         
         CounterA.reset()
 
+        # with torch.no_grad():
         features = self.initial_categorizer(x)
         features = torch.flatten(features, 1)
         fc = self.fc_categorizer(features)
@@ -57,12 +65,10 @@ class GaterNetwork(nn.Module):
         outputs = []
         output_masks = []
 
-        f = self.feature_extractor(x)
-        f = torch.flatten(f, 1)
         for idx, network in enumerate(self.subgroups_network):
             mask = (subgroup_idx == idx)
             if mask.any():
-                subgroup_x = f[mask]
+                subgroup_x = x[mask]
                 outputs.append(network(subgroup_x))
                 output_masks.append(mask.nonzero(as_tuple=False).view(-1))
 
