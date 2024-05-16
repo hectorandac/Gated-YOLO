@@ -1,3 +1,4 @@
+cython
 numpy>=1.19.5
 opencv-python
 PyYAML>=5.3.1
