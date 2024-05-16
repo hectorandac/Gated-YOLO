@@ -4,43 +4,72 @@ import torch.nn.functional as F
 import torchvision.models as models
 from yolov6.layers.common import CounterA
 
-class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size):
+class GatesGenerator(nn.Module):
+    def __init__(self, num_features, num_filters, bottleneck_size):
         super().__init__()
-        # Feature extractor (E)
-        self.feature_extractor = feature_extractor_arch(pretrained=False)
-        
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.fc1 = nn.Linear(num_features, bottleneck_size)
-        self.bn1 = nn.BatchNorm1d(bottleneck_size)
+        self.bn1 = nn.LayerNorm(bottleneck_size)
         self.relu1 = nn.ReLU()
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
-        self.bn2 = nn.BatchNorm1d(num_filters)
-        self.relu2 = nn.ReLU()
 
+    def forward(self, x):
+        # Bottleneck mapping
+        f0 = self.fc1(x)
+        f0 = self.bn1(f0)
+        f0 = self.relu1(f0)
+        
+        # Real-valued vector before binarization
+        g0 = self.fc2(f0)
+        return g0
+
+class GaterNetwork(nn.Module):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size):
+        super().__init__()
+
+        self.subgroups = 10
         self.sections = sections
+        self.enable_fixed_gates = False
 
-        self.enable_fixed_gates = False # default 
+        self.initial_categorizer = models.resnet101(pretrained=True)
+        self.initial_categorizer = nn.Sequential(*list(self.initial_categorizer.children())[:-1])
+        self.fc_categorizer = nn.Linear(2048, self.subgroups)
+        
+        self.feature_extractor = feature_extractor_arch(pretrained=False)
+        self.subgroups_network = nn.ModuleList([
+            GatesGenerator(num_features, num_filters, bottleneck_size) for _ in range(self.subgroups)
+        ])
 
     def forward(self, x, training=False, epsilon=None):
         if self.enable_fixed_gates:
             return self.fixed_gates
         
         CounterA.reset()
-        # Feature extraction
+
+        features = self.initial_categorizer(x)
+        features = torch.flatten(features, 1)
+        fc = self.fc_categorizer(features)
+        subgroup_idx = torch.argmax(fc, dim=1)
+
+        g0 = None
+
+        outputs = []
+        output_masks = []
+
         f = self.feature_extractor(x)
         f = torch.flatten(f, 1)
-        
-        # Bottleneck mapping
-        f0 = self.fc1(f)
-        f0 = self.bn1(f0)
-        f0 = self.relu1(f0)
-        
-        # Real-valued vector before binarization
-        g0 = self.fc2(f0)
-        g0 = self.bn2(g0)
-        g0 = self.relu2(g0)
+        for idx, network in enumerate(self.subgroups_network):
+            mask = (subgroup_idx == idx)
+            if mask.any():
+                subgroup_x = f[mask]
+                outputs.append(network(subgroup_x))
+                output_masks.append(mask.nonzero(as_tuple=False).view(-1))
+
+        final_output = torch.cat(outputs, dim=0)
+        indices = torch.cat(output_masks, dim=0)
+        reorder_mask = indices.argsort()
+        g0 = final_output[reorder_mask]
         
         if training:
             ## SEM HASH
@@ -60,7 +89,7 @@ class GaterNetwork(nn.Module):
             section_gates_list.append([g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1), None])
             start_idx = end_idx
         
-        return section_gates_list
+        return section_gates_list, subgroup_idx, fc
     
     @staticmethod
     def create_feature_extractor_resnet101(pretrained=True):

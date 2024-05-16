@@ -10,8 +10,19 @@ from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy, box_iou
 from yolov6.utils.figure_iou import IOUloss
 from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
-from collections import Counter
 
+class_to_group = {
+    2: 0, 3: 0,         # Group 1
+    4: 1, 8: 1, 10: 1, 14: 1, 15: 1, 17: 1, 19: 1,  # Group 2
+    11: 2, 16: 2,       # Group 3
+    5: 3, 6: 3,         # Group 4
+    1: 4, 13: 4,        # Group 5
+    18: 5,              # Group 6
+    0: 6,               # Group 7
+    7: 7,               # Group 8
+    12: 8,              # Group 9
+    9: 9                # Group 10
+}
 
 class ComputeLoss:
     '''Loss computation func.'''
@@ -58,7 +69,8 @@ class ComputeLoss:
         epoch_num,
         step_num,
         lambda_reg,
-        gating_decision, 
+        gating_decision,
+        subgroups
     ):
         feats, pred_scores, pred_distri = outputs
         if all(feat.shape[2:] == cfsize for feat, cfsize in zip(feats, self.cached_feat_sizes)):
@@ -212,8 +224,38 @@ class ComputeLoss:
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
 
+
+        if subgroups is not None:
+            subgroup_idx = self.determine_dominant_subgroup(target_labels, mask_gt)
+            subgroup_logits = subgroups[1]
+            subgroup_loss_fn = nn.CrossEntropyLoss()
+            subgroup_loss = subgroup_loss_fn(subgroup_logits, subgroup_idx)
+            loss += subgroup_loss
+            loss_components.append(subgroup_loss.unsqueeze(0))
+
         return loss, torch.cat(loss_components).detach()
-    
+
+    def map_classes_to_subgroups(self, gt_labels):
+        # Map class labels to subgroup labels
+        subgroup_labels = torch.zeros_like(gt_labels)
+        for cls, grp in class_to_group.items():
+            subgroup_labels[gt_labels == cls] = grp
+        return subgroup_labels
+
+    def determine_dominant_subgroup(self, gt_labels, mask_gt):
+        # Determine the dominant subgroup for each image in the batch
+        batch_size = gt_labels.shape[0]
+        dominant_subgroups = torch.zeros(batch_size, dtype=torch.long, device=gt_labels.device)
+        for i in range(batch_size):
+            valid_labels = gt_labels[i][gt_labels[i] != self.num_classes]
+            if valid_labels.numel() == 0:
+                dominant_subgroups[i] = 0
+            else:
+                subgroup_labels = self.map_classes_to_subgroups(valid_labels)
+                # Determine the most common subgroup
+                dominant_subgroups[i] = subgroup_labels.mode().values.item()
+        return dominant_subgroups
+
     def calculate_gate_diversity_loss(gate_class_associations, detected_classes, similarity_threshold=0.5):
         """
         Calculates the diversity loss based on gate activations and associated detected classes.

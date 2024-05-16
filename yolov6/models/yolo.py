@@ -37,7 +37,7 @@ class Model(nn.Module):
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
         if self.enable_gater_net:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0)
+            gating_decisions, subgroup_idx, subgroup_logits = self.gater(x, training=self.training, epsilon=1.0)
         else:
             gating_decisions = None
         
@@ -48,7 +48,7 @@ class Model(nn.Module):
             featmaps.extend(x)
         if self.training:
             x = self.detect(x, gating_decisions)
-            return x, gating_decisions, featmaps
+            return x, gating_decisions, featmaps, [subgroup_idx, subgroup_logits]
         else:
             x = self.detect(x, gating_decisions)
             return x, gating_decisions, None
@@ -196,6 +196,10 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
             num_filters=num_filters,
             sections=cumulativeGatesChannels,
         )
+
+        for state_name in gater.state_dict():
+            print(f"🚧 Gate: {state_name}")
+
 
     return backbone, neck, head, gater
 
