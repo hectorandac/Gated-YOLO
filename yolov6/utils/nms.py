@@ -38,7 +38,7 @@ def non_max_suppression_y(prediction, conf_thres=0.25, iou_thres=0.45, classes=N
 
     max_wh = 4096
     max_nms = 30000
-    time_limit = 10.0
+    time_limit = 100.0
     multi_label &= num_classes > 1
 
     tik = time.time()
