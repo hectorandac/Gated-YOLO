@@ -2,13 +2,18 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+from datetime import datetime
 
+# Argument parser
 parser = argparse.ArgumentParser(description='Analyze and visualize gating decisions.')
 parser.add_argument('path', type=str, help='Path to the .pt file containing gating decisions.')
+parser.add_argument('-o', '--output', type=str, default='gates_status_visualization', help='Output filename (without extension).')
 args = parser.parse_args()
 
+# Load gating decisions
 gating_decisions = torch.load(args.path)
 
+# Analyze gating decisions
 specific_gate_analysis = []
 for i, section_gates in enumerate(gating_decisions):
     if section_gates[0] is None:
@@ -29,6 +34,7 @@ for i, section_gates in enumerate(gating_decisions):
         'partially_active': partially_active_indices
     })
 
+# Print analysis
 for analysis in specific_gate_analysis:
     layer = analysis['layer']
     if 'status' in analysis and analysis['status'] == 'blocked':
@@ -39,7 +45,7 @@ for analysis in specific_gate_analysis:
         partial_gates = ', '.join(map(str, analysis['partially_active']))
         print(f"Layer {layer}:\nCompletely Off Gates: [{off_gates}]\nAlways On Gates: [{on_gates}]\nPartially active: [{partial_gates}]")
 
-
+# Create gate status matrix
 num_layers = max([a['layer'] for a in specific_gate_analysis])
 num_gates = max([max(a['always_on'] + a['completely_off'], default=0) for a in specific_gate_analysis if 'status' not in a], default=0) + 1
 gate_status_matrix = np.full((num_layers, num_gates), 0.5)
@@ -64,12 +70,16 @@ plt.ylabel('Layer Number')
 plt.title('Gate Activation Status Across Layers')
 
 # Adjust ticks if necessary based on your number of gates and layers
-plt.xticks(range(0, num_gates, max(1, num_gates // 10)))  # Show every 10th gate index if many gates
+plt.xticks(range(0, num_gates, max(1, num_gates // 10)))
 plt.yticks(range(num_layers))
 
 plt.tight_layout()
 
+# Generate the output filename
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+output_filename = f"{args.output}_{timestamp}.png"
+
 # Save the figure before showing it
-plt.savefig('gates_status_visualization.png', dpi=300)
+plt.savefig(output_filename, dpi=300)
 
 plt.show()
