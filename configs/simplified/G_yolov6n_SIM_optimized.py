@@ -1,7 +1,7 @@
 # YOLOv6s model
 model = dict(
     type='YOLOv6n',
-    pretrained='runs/train/NG-Nano-VOC/weights/last_ckpt.pt',
+    pretrained='runs\\train\\Nano-VOC1\\weights\\best_ckpt.pt',
     depth_multiple=0.33,
     width_multiple=0.25,
     backbone=dict(
