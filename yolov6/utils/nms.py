@@ -38,7 +38,7 @@ def non_max_suppression_y(prediction, conf_thres=0.25, iou_thres=0.45, classes=N
 
     max_wh = 4096
     max_nms = 30000
-    time_limit = 10.0
+    time_limit = 100.0
     multi_label &= num_classes > 1
 
     tik = time.time()
@@ -113,7 +113,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     # Function settings.
     max_wh = 4096  # maximum box width and height
     max_nms = 30000  # maximum number of boxes put into torchvision.ops.nms()
-    time_limit = 10.0  # quit the function when nms cost time exceed the limit time.
+    time_limit = 100.0  # quit the function when nms cost time exceed the limit time.
     multi_label &= num_classes > 1  # multiple labels per box
 
     tik = time.time()

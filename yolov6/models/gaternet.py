@@ -13,11 +13,11 @@ class GaterNetwork(nn.Module):
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.fc1 = nn.Linear(num_features, bottleneck_size)
         self.bn1 = nn.BatchNorm1d(bottleneck_size)
-        self.relu1 = nn.LeakyReLU(0.0001)
+        self.relu1 = nn.PReLU()
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
         self.bn2 = nn.BatchNorm1d(num_filters)
-        self.relu2 = nn.LeakyReLU(0.0001)
+        self.relu2 = nn.PReLU()
 
         self.sections = sections
 
@@ -37,18 +37,18 @@ class GaterNetwork(nn.Module):
         f0 = self.bn1(f0)
         f0 = self.relu1(f0)
 
-        if training:
-            print(f"BatchNorm1 - Mean: {self.bn1.running_mean.mean().item()}, Variance: {self.bn1.running_var.mean().item()}")
-            print(f"ReLU1 - Percentage of zeros: {(f0 == 0).float().mean().item() * 100}%")
+        #if training:
+            #print(f"BatchNorm1 - Mean: {self.bn1.running_mean.mean().item()}, Variance: {self.bn1.running_var.mean().item()}")
+            #print(f"ReLU1 - Percentage of zeros: {(f0 == 0).float().mean().item() * 100}%")
         
         # Real-valued vector before binarization
         g0 = self.fc2(f0)
         g0 = self.bn2(g0)
         g0 = self.relu2(g0)
         
-        if training:
-            print(f"BatchNorm2 - Mean: {self.bn2.running_mean.mean().item()}, Variance: {self.bn2.running_var.mean().item()}")
-            print(f"ReLU2 - Percentage of zeros: {(g0 == 0).float().mean().item() * 100}%")
+        #if training:
+            #print(f"BatchNorm2 - Mean: {self.bn2.running_mean.mean().item()}, Variance: {self.bn2.running_var.mean().item()}")
+            #print(f"ReLU2 - Percentage of zeros: {(g0 == 0).float().mean().item() * 100}%")
         
         if training:
             ## SEM HASH
@@ -56,7 +56,7 @@ class GaterNetwork(nn.Module):
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
-            g_beta = (g0_noisy > 0).float()
+            g_beta = (g0_noisy > -0.5).float()
             g = g_beta + g_alpha - g_alpha.detach()
 
             closed_gates_percentage_alpha = (g_alpha == 0).float().mean().item() * 100
@@ -66,7 +66,7 @@ class GaterNetwork(nn.Module):
             print(f"Training - Percentage of closed gates (g_beta): {closed_gates_percentage_beta:.2f}%")
         else:
             # During inference, always use the binary gates
-            g = (g0 > 0).float()
+            g = (g0 > -0.5).float()
 
         section_gates_list = []
         start_idx = 0
