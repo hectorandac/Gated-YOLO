@@ -17,7 +17,6 @@ class GaterNetwork(nn.Module):
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
         self.bn2 = nn.BatchNorm1d(num_filters)
-        self.relu2 = nn.PReLU()
 
         self.sections = sections
 
@@ -44,7 +43,6 @@ class GaterNetwork(nn.Module):
         # Real-valued vector before binarization
         g0 = self.fc2(f0)
         g0 = self.bn2(g0)
-        g0 = self.relu2(g0)
         
         #if training:
             #print(f"BatchNorm2 - Mean: {self.bn2.running_mean.mean().item()}, Variance: {self.bn2.running_var.mean().item()}")
