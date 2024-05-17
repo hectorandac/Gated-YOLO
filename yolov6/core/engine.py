@@ -236,13 +236,6 @@ class Trainer:
                     'results': self.evaluate_results,
                     }
             
-            if self.epoch >= 20 and (self.epoch % 10) < 5:
-                self.model.module.gater.freeze()
-                print(f"Epoch {self.epoch + 1}: GaterNetwork is frozen.")
-            else:
-                self.model.module.gater.unfreeze()
-                print(f"Epoch {self.epoch + 1}: GaterNetwork is unfrozen.")
-
             save_ckpt_dir = osp.join(self.save_dir, 'weights')
             save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt')
             if self.epoch >= self.max_epoch - self.args.save_ckpt_on_last_n_epoch:
@@ -381,6 +374,13 @@ class Trainer:
             self.train_loader.sampler.set_epoch(self.epoch)
         self.mean_loss = torch.zeros(self.loss_num, device=self.device)
         self.optimizer.zero_grad()
+
+        if self.epoch >= 20 and (self.epoch % 10) < 5:
+            self.model.module.gater.freeze()
+            print(f"Epoch {self.epoch + 1}: GaterNetwork is frozen.")
+        else:
+            self.model.module.gater.unfreeze()
+            print(f"Epoch {self.epoch + 1}: GaterNetwork is unfrozen.")
 
         LOGGER.info(('\n' + '%10s' * (self.loss_num + 2)) % (*self.loss_info,))
         self.pbar = enumerate(self.train_loader)
