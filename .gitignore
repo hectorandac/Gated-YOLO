@@ -28,6 +28,7 @@ wheels/
 MANIFEST
 
 dataset
+datasets
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -117,8 +118,7 @@ venv.bak/
 
 *.whl
 
-data/images/videoplayback.mp4
-data/images/video2.mp4
+
 data_object_label_2.zip
 gate_proportions.csv
 gating_analysis.png
