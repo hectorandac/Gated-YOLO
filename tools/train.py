@@ -42,7 +42,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--name', default='exp', type=str, help='experiment name, saved to output_dir/name')
     parser.add_argument('--dist_url', default='env://', type=str, help='url used to set up distributed training')
     parser.add_argument('--gpu_count', type=int, default=0)
-    parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter')
+    parser.add_argument('--local-rank', type=int, default=-1, help='DDP parameter')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume the most recent training')
     parser.add_argument('--write_trainbatch_tb', action='store_true', help='write train_batch image to tensorboard once an epoch, may slightly slower train speed if open')
     parser.add_argument('--stop_aug_last_n_epoch', default=15, type=int, help='stop strong aug at last n epoch, neg value not stop, default 15')
