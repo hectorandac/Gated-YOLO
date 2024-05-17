@@ -62,8 +62,8 @@ class GaterNetwork(nn.Module):
             closed_gates_percentage_alpha = (g_alpha == 0).float().mean().item() * 100
             closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
             
-            print(f"Training - Percentage of closed gates (g_alpha): {closed_gates_percentage_alpha:.2f}%")
-            print(f"Training - Percentage of closed gates (g_beta): {closed_gates_percentage_beta:.2f}%")
+            #print(f"Training - Percentage of closed gates (g_alpha): {closed_gates_percentage_alpha:.2f}%")
+            #print(f"Training - Percentage of closed gates (g_beta): {closed_gates_percentage_beta:.2f}%")
         else:
             # During inference, always use the binary gates
             g = (g0 > -0.5).float()
