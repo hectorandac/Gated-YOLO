@@ -59,8 +59,8 @@ class GaterNetwork(nn.Module):
             g_beta = (g0_noisy > -0.5).float()
             g = g_beta + g_alpha - g_alpha.detach()
 
-            closed_gates_percentage_alpha = (g_alpha == 0).float().mean().item() * 100
-            closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
+            #closed_gates_percentage_alpha = (g_alpha == 0).float().mean().item() * 100
+            #closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
             
             #print(f"Training - Percentage of closed gates (g_alpha): {closed_gates_percentage_alpha:.2f}%")
             #print(f"Training - Percentage of closed gates (g_beta): {closed_gates_percentage_beta:.2f}%")
