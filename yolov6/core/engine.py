@@ -235,6 +235,13 @@ class Trainer:
                     'epoch': self.epoch,
                     'results': self.evaluate_results,
                     }
+            
+            if self.epoch >= 20 and (self.epoch % 10) < 5:
+                self.model.gater.freeze()
+                print(f"Epoch {self.epoch + 1}: GaterNetwork is frozen.")
+            else:
+                self.model.gater.unfreeze()
+                print(f"Epoch {self.epoch + 1}: GaterNetwork is unfrozen.")
 
             save_ckpt_dir = osp.join(self.save_dir, 'weights')
             save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt')

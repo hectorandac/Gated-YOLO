@@ -62,6 +62,14 @@ class GaterNetwork(nn.Module):
         
         return section_gates_list
     
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfreeze(self):
+        for param in self.parameters():
+            param.requires_grad = True
+    
     @staticmethod
     def create_feature_extractor_resnet101(pretrained=True):
         # For example, use ResNet18 as the base model
