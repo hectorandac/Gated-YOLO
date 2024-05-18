@@ -10,7 +10,7 @@ apt upgrade -y
 apt install python3-pip unzip
 
 # Step 3: Clone the specified repository and checkout the branch
-git clone --branch gated-yolo-merge https://github.com/hectorandac/Gated-YOLOv6.git
+git clone --branch gated-yolo https://github.com/hectorandac/Gated-YOLOv6.git
 
 cd Gated-YOLOv6
 
