@@ -58,16 +58,6 @@ def save_proportions_to_file(proportions, filename='gate_proportions.csv'):
         writer = csv.writer(file)
         writer.writerow(proportions)
 
-#def load_proportions_from_file(filename='gate_proportions.csv'):
-#    proportions = []
-#    with open(filename, newline='') as file:
-#        reader = csv.reader(file)
-#        for row in reader:
-#            proportions.append([float(val) for val in row])
-#    return proportions
-
-#data_over_time = load_proportions_from_file()
-
 def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
     """Display mAP and loss information to log."""
     tblogger.add_scalar("val/mAP@0.5", results[0], epoch + 1)
@@ -79,10 +69,6 @@ def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
 
     if len(losses) >= 4:
         tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
-        percentage_open_gates = [calculate_open_gates_percentage(layer_gates) for layer_gates in gates]
-        save_proportions_to_file(percentage_open_gates)
-        tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1, bins=100)
-            
 
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)
     tblogger.add_scalar("x/lr1", lrs[1], epoch + 1)
