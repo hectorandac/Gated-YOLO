@@ -28,6 +28,7 @@ wheels/
 MANIFEST
 
 dataset
+datasets
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -109,9 +110,6 @@ venv.bak/
 
 #vscode
 .vscode/*
-
-#user scripts
-*.sh
 
 # model files
 *.onnx
