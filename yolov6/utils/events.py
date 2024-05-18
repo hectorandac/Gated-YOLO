@@ -72,7 +72,7 @@ def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
         percentage_open_gates = [calculate_open_gates_percentage(layer_gates) for layer_gates in gates]
         percentage_open_gates = np.array(percentage_open_gates, dtype=float)
         save_proportions_to_file(percentage_open_gates)
-        tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1, bins=100)
+        #tblogger.add_histogram('Percentage Open Gates by Layer', np.array(percentage_open_gates), global_step=epoch + 1)
             
 
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)
