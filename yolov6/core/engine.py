@@ -375,7 +375,7 @@ class Trainer:
         self.mean_loss = torch.zeros(self.loss_num, device=self.device)
         self.optimizer.zero_grad()
 
-        if self.epoch >= 5 and (self.epoch % 6) < 3:
+        if self.epoch >= 20 and (self.epoch % 10) < 5:
             self.model.gater.freeze()
             LOGGER.info(f"Epoch {self.epoch + 1}: GaterNetwork is frozen.")
         else:

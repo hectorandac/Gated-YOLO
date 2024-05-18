@@ -13,7 +13,7 @@ class GaterNetwork(nn.Module):
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.fc1 = nn.Linear(num_features, bottleneck_size)
         self.bn1 = nn.BatchNorm1d(bottleneck_size)
-        self.relu1 = nn.PReLU()
+        self.relu1 = nn.ReLU()
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
         self.bn2 = nn.BatchNorm1d(num_filters)
@@ -54,7 +54,7 @@ class GaterNetwork(nn.Module):
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
-            g_beta = (g0_noisy > -0.5).float()
+            g_beta = (g0_noisy > -0.8).float()
             g = g_beta + g_alpha - g_alpha.detach()
 
             #closed_gates_percentage_alpha = (g_alpha == 0).float().mean().item() * 100
@@ -64,7 +64,7 @@ class GaterNetwork(nn.Module):
             #print(f"Training - Percentage of closed gates (g_beta): {closed_gates_percentage_beta:.2f}%")
         else:
             # During inference, always use the binary gates
-            g = (g0 > -0.5).float()
+            g = (g0 > -0.8).float()
 
         section_gates_list = []
         start_idx = 0
