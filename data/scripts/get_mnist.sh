@@ -18,6 +18,7 @@ import shutil
 import torchvision
 from torchvision import datasets, transforms
 from PIL import Image
+import numpy as np
 
 # Define directories
 dataset_dir = os.path.join('..', 'MNIST')
@@ -52,9 +53,24 @@ def save_data(dataset, image_dir, label_dir, start_idx=0):
         pil_image = transforms.ToPILImage()(image)
         pil_image.save(image_path)
         
-        # Save label
-        with open(label_path, 'w') as f:
-            f.write(f'0 {label}\n')
+        # Convert tensor to numpy array
+        np_image = np.array(pil_image)
+        
+        # Find bounding box for the digit
+        digit_indices = np.where(np_image > 0)
+        if digit_indices[0].size > 0:
+            y_min, y_max = digit_indices[0].min(), digit_indices[0].max()
+            x_min, x_max = digit_indices[1].min(), digit_indices[1].max()
+            
+            # Calculate bounding box coordinates and size
+            x_center = (x_min + x_max) / 2.0 / np_image.shape[1]
+            y_center = (y_min + y_max) / 2.0 / np_image.shape[0]
+            width = (x_max - x_min) / np_image.shape[1]
+            height = (y_max - y_min) / np_image.shape[0]
+            
+            # Save label in the format: class x_center y_center width height
+            with open(label_path, 'w') as f:
+                f.write(f'{label} {x_center} {y_center} {width} {height}\n')
 
 # Save training data
 save_data(train_dataset, train_images_dir, train_labels_dir)
