@@ -110,6 +110,9 @@ class Trainer:
         self.fixed_gates = args.fixed_gates
 
         ddp_mode = device.type != 'cpu' and args.rank != -1
+        self.ddp_mode = ddp_mode
+
+        self.flag_stop_gates = False
         
         if ddp_mode:
             self.model.module.neck.enable_gater_net = args.enable_gater_net
@@ -183,7 +186,12 @@ class Trainer:
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
-            preds, gates, s_featmaps = self.model(images)
+            preds, gates, s_featmaps, closed_gates_percentage = self.model(images)
+
+            allowed_closed_gates = min(max(10 * (epoch_num // 10), 40), 100)
+            if self.enable_gater_net and closed_gates_percentage > allowed_closed_gates and self.flag_stop_gates == False:
+                print(f"Gates signal stop (g_beta): {closed_gates_percentage:.2f}%")
+                self.flag_stop_gates = True
 
             self.gates = gates
             if self.args.distill:
@@ -373,6 +381,21 @@ class Trainer:
             self.train_loader.sampler.set_epoch(self.epoch)
         self.mean_loss = torch.zeros(self.loss_num, device=self.device)
         self.optimizer.zero_grad()
+
+        if self.flag_stop_gates:
+            LOGGER.info("Gates are frozen 🛑")
+            #if self.ddp_mode:
+                #self.model.module.gater.freeze()
+            #else:
+                #self.model.gater.freeze()
+        else:
+            LOGGER.info("Gates are flowing 👍")
+            #if self.ddp_mode:
+                #self.model.module.gater.unfreeze()
+            #else:
+                #self.model.gater.unfreeze()
+        
+        self.flag_stop_gates = False
 
         LOGGER.info(('\n' + '%10s' * (self.loss_num + 2)) % (*self.loss_info,))
         self.pbar = enumerate(self.train_loader)

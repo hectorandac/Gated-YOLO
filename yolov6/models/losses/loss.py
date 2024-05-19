@@ -202,7 +202,7 @@ class ComputeLoss:
                 class_to_gates_mapping_per_image.append(class_to_gates)
 
             gating_loss = g_reconstructed.mean(dim=1).mean()
-            gating_loss = (gating_loss * lambda_reg)
+            gating_loss = gating_loss * (lambda_reg / (1 + 0.5 * epoch_num))
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
 
