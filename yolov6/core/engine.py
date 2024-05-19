@@ -167,9 +167,12 @@ class Trainer:
 
     # Training loop for each epoch
     def train_one_epoch(self, epoch_num):
+        print_detail = True
         try:
             for self.step, self.batch_data in self.pbar:
-                self.train_in_steps(epoch_num, self.step)
+                last_g_percetage = self.train_in_steps(epoch_num, self.step)
+                if print_detail:
+                    print(f"Gates signal (g_beta): {last_g_percetage:.2f}%")
                 self.print_details()
         except Exception as _:
             LOGGER.error('ERROR in training steps.')
@@ -183,13 +186,13 @@ class Trainer:
             self.plot_train_batch(images, targets)
             write_tbimg(self.tblogger, self.vis_train_batch, self.step + self.max_stepnum * self.epoch, type='train')
 
+        closed_gates_percentage = 0
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
             preds, gates, s_featmaps, closed_gates_percentage = self.model(images)
 
             allowed_closed_gates = min(max(10 * (epoch_num // 10), 40), 100)
-            print(f"Gates signal (g_beta): {closed_gates_percentage:.2f}%")
             if self.enable_gater_net and closed_gates_percentage > allowed_closed_gates and self.flag_stop_gates == False:
                 self.flag_stop_gates = True
 
@@ -219,6 +222,7 @@ class Trainer:
         self.scaler.scale(total_loss).backward()
         self.loss_items = loss_items
         self.update_optimizer()
+        return closed_gates_percentage
 
     def after_epoch(self):
         lrs_of_this_epoch = [x['lr'] for x in self.optimizer.param_groups]
