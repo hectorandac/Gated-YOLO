@@ -189,8 +189,8 @@ class Trainer:
             preds, gates, s_featmaps, closed_gates_percentage = self.model(images)
 
             allowed_closed_gates = min(max(10 * (epoch_num // 10), 40), 100)
+            print(f"Gates signal (g_beta): {closed_gates_percentage:.2f}%")
             if self.enable_gater_net and closed_gates_percentage > allowed_closed_gates and self.flag_stop_gates == False:
-                print(f"Gates signal stop (g_beta): {closed_gates_percentage:.2f}%")
                 self.flag_stop_gates = True
 
             self.gates = gates
