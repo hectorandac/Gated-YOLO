@@ -173,6 +173,7 @@ class Trainer:
                 last_g_percetage = self.train_in_steps(epoch_num, self.step)
                 if print_detail:
                     print(f"Gates signal (g_beta): {last_g_percetage:.2f}%")
+                    print_detail = False
                 self.print_details()
         except Exception as _:
             LOGGER.error('ERROR in training steps.')
