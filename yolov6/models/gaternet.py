@@ -16,6 +16,8 @@ class GaterNetwork(nn.Module):
         self.relu1 = nn.ReLU()
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
+        # self.bn2 = nn.BatchNorm1d(num_filters)
+
         self.sections = sections
 
         self.enable_fixed_gates = False # default 
@@ -36,6 +38,9 @@ class GaterNetwork(nn.Module):
         
         # Real-valued vector before binarization
         g0 = self.fc2(f0)
+        # g0 = self.bn2(g0)
+
+        closed_gates_percentage_beta = 0
         
         if training:
             ## SEM HASH
@@ -43,11 +48,14 @@ class GaterNetwork(nn.Module):
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
-            g_beta = (g0_noisy > 0).float()
-            g = g_beta if torch.rand(1).item() < 0.5 else g_alpha
+            g_beta = (g0_noisy > -0.8).float()
+            g = g_beta + g_alpha - g_alpha.detach()
+            
+            closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
+
         else:
             # During inference, always use the binary gates
-            g = (g0 > 0).float()
+            g = (g0 > -0.8).float()
 
         section_gates_list = []
         start_idx = 0
@@ -55,7 +63,15 @@ class GaterNetwork(nn.Module):
             section_gates_list.append([g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1), None])
             start_idx = end_idx
         
-        return section_gates_list
+        return section_gates_list, closed_gates_percentage_beta
+    
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfreeze(self):
+        for param in self.parameters():
+            param.requires_grad = True
     
     @staticmethod
     def create_feature_extractor_resnet101(pretrained=True):

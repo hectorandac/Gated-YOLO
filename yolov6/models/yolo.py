@@ -36,8 +36,9 @@ class Model(nn.Module):
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
+        closed_gates_percentage = 0
         if self.enable_gater_net:
-            gating_decisions = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
+            gating_decisions, closed_gates_percentage = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
         else:
             gating_decisions = None
         
@@ -48,7 +49,7 @@ class Model(nn.Module):
             featmaps.extend(x)
         if self.training:
             x = self.detect(x, gating_decisions)
-            return x, gating_decisions, featmaps
+            return x, gating_decisions, featmaps, closed_gates_percentage
         else:
             x = self.detect(x, gating_decisions)
             return x, gating_decisions, None

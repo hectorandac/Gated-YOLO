@@ -110,6 +110,9 @@ class Trainer:
         self.fixed_gates = args.fixed_gates
 
         ddp_mode = device.type != 'cpu' and args.rank != -1
+        self.ddp_mode = ddp_mode
+
+        self.flag_stop_gates = False
         
         if ddp_mode:
             self.model.module.neck.enable_gater_net = args.enable_gater_net
@@ -164,9 +167,13 @@ class Trainer:
 
     # Training loop for each epoch
     def train_one_epoch(self, epoch_num):
+        print_detail = True
         try:
             for self.step, self.batch_data in self.pbar:
-                self.train_in_steps(epoch_num, self.step)
+                last_g_percetage = self.train_in_steps(epoch_num, self.step)
+                if print_detail:
+                    print(f"Gates signal (g_beta): {last_g_percetage:.2f}%")
+                    print_detail = False
                 self.print_details()
         except Exception as _:
             LOGGER.error('ERROR in training steps.')
@@ -180,10 +187,15 @@ class Trainer:
             self.plot_train_batch(images, targets)
             write_tbimg(self.tblogger, self.vis_train_batch, self.step + self.max_stepnum * self.epoch, type='train')
 
+        closed_gates_percentage = 0
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
-            preds, gates, s_featmaps = self.model(images)
+            preds, gates, s_featmaps, closed_gates_percentage = self.model(images)
+
+            allowed_closed_gates = min(max(10 * (epoch_num // 10), 40), 100)
+            if self.enable_gater_net and closed_gates_percentage > allowed_closed_gates and self.flag_stop_gates == False:
+                self.flag_stop_gates = True
 
             self.gates = gates
             if self.args.distill:
@@ -211,6 +223,7 @@ class Trainer:
         self.scaler.scale(total_loss).backward()
         self.loss_items = loss_items
         self.update_optimizer()
+        return closed_gates_percentage
 
     def after_epoch(self):
         lrs_of_this_epoch = [x['lr'] for x in self.optimizer.param_groups]
@@ -373,6 +386,21 @@ class Trainer:
             self.train_loader.sampler.set_epoch(self.epoch)
         self.mean_loss = torch.zeros(self.loss_num, device=self.device)
         self.optimizer.zero_grad()
+
+        if self.flag_stop_gates:
+            LOGGER.info("Gates are frozen 🛑")
+            #if self.ddp_mode:
+                #self.model.module.gater.freeze()
+            #else:
+                #self.model.gater.freeze()
+        else:
+            LOGGER.info("Gates are flowing 👍")
+            #if self.ddp_mode:
+                #self.model.module.gater.unfreeze()
+            #else:
+                #self.model.gater.unfreeze()
+        
+        self.flag_stop_gates = False
 
         LOGGER.info(('\n' + '%10s' * (self.loss_num + 2)) % (*self.loss_info,))
         self.pbar = enumerate(self.train_loader)
