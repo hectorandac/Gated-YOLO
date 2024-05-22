@@ -64,3 +64,11 @@ data_aug = dict(
     mosaic=1.0,
     mixup=0.1,
 )
+
+loss_weight = {
+    'class': 1.8,
+    'iou': 3.5,
+    'dfl': 0.5,
+    'gtg': 0.5,
+    'gtg_decay': 0.25
+}
