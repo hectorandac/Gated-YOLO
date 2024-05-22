@@ -68,6 +68,10 @@ def check_and_init(args):
     '''check config files and device.'''
     # check files
     master_process = args.rank == 0 if args.world_size > 1 else args.rank == -1
+
+    cfg = Config.fromfile(args.conf_file)
+    args.loss_hyper = str(cfg.loss_weight)
+
     if args.resume:
         # args.resume can be a checkpoint file path or a boolean value.
         checkpoint_path = args.resume if isinstance(args.resume, str) else find_latest_checkpoint()
@@ -97,7 +101,6 @@ def check_and_init(args):
     else:
         args.img_size = check_img_size(args.img_size, 32, floor=256)
 
-    cfg = Config.fromfile(args.conf_file)
     if not hasattr(cfg, 'training_mode'):
         setattr(cfg, 'training_mode', 'repvgg')
     # check device

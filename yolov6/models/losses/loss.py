@@ -26,9 +26,12 @@ class ComputeLoss:
                  reg_max=16,
                  iou_type='giou',
                  loss_weight={
-                     'class': 1.3,
+                     'class': 1.8,
                      'iou': 3.5,
-                     'dfl': 0.5},
+                     'dfl': 0.5,
+                     'gtg': 0.5,
+                     'gtg_decay': 0.25
+                    },
                  ):
 
         self.fpn_strides = fpn_strides
@@ -55,7 +58,6 @@ class ComputeLoss:
         targets,        
         epoch_num,
         step_num,
-        lambda_reg,
         gating_decision, 
     ):
         feats, pred_scores, pred_distri = outputs
@@ -202,7 +204,7 @@ class ComputeLoss:
                 class_to_gates_mapping_per_image.append(class_to_gates)
 
             gating_loss = g_reconstructed.mean(dim=1).mean()
-            gating_loss = gating_loss * (lambda_reg / (1 + 0.5 * epoch_num))
+            gating_loss = gating_loss * (self.loss_weight['gtg'] / (1 + self.loss_weight['gtg_decay']  * epoch_num))
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
 

@@ -48,14 +48,14 @@ class GaterNetwork(nn.Module):
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
-            g_beta = (g0_noisy > -0.8).float()
+            g_beta = (g0_noisy > -0.9).float()
             g = g_beta + g_alpha - g_alpha.detach()
             
             closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
 
         else:
             # During inference, always use the binary gates
-            g = (g0 > -0.8).float()
+            g = (g0 > -0.9).float()
 
         section_gates_list = []
         start_idx = 0

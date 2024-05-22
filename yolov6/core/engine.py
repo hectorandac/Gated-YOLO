@@ -170,9 +170,9 @@ class Trainer:
         print_detail = True
         try:
             for self.step, self.batch_data in self.pbar:
-                last_g_percetage = self.train_in_steps(epoch_num, self.step)
+                self.last_g_percetage = self.train_in_steps(epoch_num, self.step)
                 if print_detail:
-                    print(f"Gates signal (g_beta): {last_g_percetage:.2f}%")
+                    print(f"Gates signal (g_beta): {self.last_g_percetage:.2f}%")
                     print_detail = False
                 self.print_details()
         except Exception as _:
@@ -214,7 +214,7 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, 1.0, gates) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, gates) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size
@@ -265,7 +265,7 @@ class Trainer:
             self.evaluate_results = list(self.evaluate_results)
 
             # log for tensorboard
-            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss, self.gates)
+            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss, self.last_g_percetage)
             # save validation predictions to tensorboard
             write_tbimg(self.tblogger, self.vis_imgs_list, self.epoch, type='val')
 
@@ -347,7 +347,9 @@ class Trainer:
                                         use_dfl=self.cfg.model.head.use_dfl,
                                         reg_max=self.cfg.model.head.reg_max,
                                         iou_type=self.cfg.model.head.iou_type,
-					                    fpn_strides=self.cfg.model.head.strides)
+					                    fpn_strides=self.cfg.model.head.strides,
+                                        loss_weight=self.cfg.loss_weight
+                                        )
 
         if self.args.fuse_ab:
             self.compute_loss_ab = ComputeLoss_ab(num_classes=self.data_dict['nc'],

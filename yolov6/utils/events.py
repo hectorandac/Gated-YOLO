@@ -58,7 +58,7 @@ def save_proportions_to_file(proportions, filename='gate_proportions.csv'):
         writer = csv.writer(file)
         writer.writerow(proportions)
 
-def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
+def write_tblog(tblogger, epoch, results, lrs, losses, closed=None):
     """Display mAP and loss information to log."""
     tblogger.add_scalar("val/mAP@0.5", results[0], epoch + 1)
     tblogger.add_scalar("val/mAP@0.50:0.95", results[1], epoch + 1)
@@ -69,6 +69,7 @@ def write_tblog(tblogger, epoch, results, lrs, losses, gates=None):
 
     if len(losses) >= 4:
         tblogger.add_scalar("train/gtg_loss", losses[3], epoch + 1)
+        tblogger.add_scalar("train/gtg_closed", closed, epoch + 1)
 
     tblogger.add_scalar("x/lr0", lrs[0], epoch + 1)
     tblogger.add_scalar("x/lr1", lrs[1], epoch + 1)
