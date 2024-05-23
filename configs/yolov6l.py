@@ -66,3 +66,11 @@ data_aug = dict(
 )
 training_mode = "conv_silu"
 # use normal conv to speed up training and further improve accuracy.
+
+loss_weight = {
+    'class': 1.8,
+    'iou': 3.5,
+    'dfl': 0.5,
+    'gtg': 0.5,
+    'gtg_decay': 0.25
+}
