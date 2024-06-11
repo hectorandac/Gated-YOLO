@@ -20,12 +20,16 @@ class Model(nn.Module):
     The default parts are EfficientRep Backbone, Rep-PAN and
     Efficient Decoupled Head.
     '''
-    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False, enable_gater_net=False):  # model, input channels, number of classes
+    def __init__(self, config, channels=3, num_classes=None, fuse_ab=False, distill_ns=False, enable_gater_net=False, fixed_gates_enabled=False):  # model, input channels, number of classes
         super().__init__()
         # Build network
         num_layers = config.model.head.num_layers
-        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net)
+        self.backbone, self.neck, self.detect, self.gater = build_network(config, channels, num_classes, num_layers, fuse_ab=fuse_ab, distill_ns=distill_ns, enable_gater_net=enable_gater_net, fixed_gates_enable=fixed_gates_enabled)
         self.enable_gater_net = enable_gater_net
+        self.fixed_gates_enable = fixed_gates_enabled
+
+        self.backbone.enable_gater_net = enable_gater_net
+        self.neck.enable_gater_net = enable_gater_net
 
         # Init Detect head
         self.stride = self.detect.stride
@@ -37,7 +41,8 @@ class Model(nn.Module):
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
         closed_gates_percentage = 0
-        if self.enable_gater_net:
+        
+        if self.enable_gater_net and not self.fixed_gates_enable:
             gating_decisions, closed_gates_percentage = self.gater(x, training=self.training, epsilon=1.0 if self.training else 0)
         else:
             gating_decisions = None
@@ -74,7 +79,7 @@ def sort_key(layer_name):
         # Return a default value that keeps the layer in its original position
         return -1
 
-def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False, enable_gater_net=False):
+def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False, enable_gater_net=False, fixed_gates_enable=False):
     depth_mul = config.model.depth_multiple
     width_mul = config.model.width_multiple
     num_repeat_backbone = config.model.backbone.num_repeats
@@ -152,44 +157,43 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
         head_layers = build_effidehead_layer(channels_list, 1, num_classes, reg_max=reg_max, num_layers=num_layers)
         head = Detect(num_classes, num_layers, head_layers=head_layers, use_dfl=use_dfl)
 
-    sections = []
-    backbone_dict = backbone.state_dict()
-    neck_dict = neck.state_dict()
-    head_dict = head.state_dict()
-
-    sorted_head_layers = sorted(head_dict.keys(), key=sort_key)
-    sorted_head_dict = {layer: head_dict[layer] for layer in sorted_head_layers}
-
-    combined_dict = {**backbone_dict, **neck_dict, **sorted_head_dict}
-
-    ignore_gates_for = [
-        "proj_conv.weight", "cls_preds.0.weight", "reg_preds.0.weight",
-        "cls_preds.1.weight", "reg_preds.1.weight", "cls_preds.2.weight", "reg_preds.2.weight",
-        "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight",
-        "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight",
-        "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight", "reg_convs.2.block.conv.weight"
-    ]
-
-    sections = []
-
-    for layer_name in combined_dict:
-        if layer_name in ignore_gates_for:
-            continue
-
-        includes = ("conv.weight", "rbr_1x1.bn.weight", "upsample_transpose.weight")
-        excludes = ("rbr_dense", "rbr_1x1.conv.weight")
-        if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes):
-            num_gates = combined_dict[layer_name].shape[0]
-            sections.append(num_gates)
-            print(f"✅ GATING: {start_bold}{layer_name:<50}{end_bold} Channels -> {num_gates}")
-
-    print(f"\nGate-able Layer's count {start_bold}{len(sections)}{end_bold} with total of {start_bold}{sum(sections)}{end_bold} Gates\n")
-
-    cumulativeGatesChannels = list(itertools.accumulate(sections))
-    num_filters = sum(sections) if channels_list else 0
-
     gater = None
-    if enable_gater_net:
+    if enable_gater_net and not fixed_gates_enable:
+        backbone_dict = backbone.state_dict()
+        neck_dict = neck.state_dict()
+        head_dict = head.state_dict()
+
+        sorted_head_layers = sorted(head_dict.keys(), key=sort_key)
+        sorted_head_dict = {layer: head_dict[layer] for layer in sorted_head_layers}
+
+        combined_dict = {**backbone_dict, **neck_dict, **sorted_head_dict}
+
+        ignore_gates_for = [
+            "proj_conv.weight", "cls_preds.0.weight", "reg_preds.0.weight",
+            "cls_preds.1.weight", "reg_preds.1.weight", "cls_preds.2.weight", "reg_preds.2.weight",
+            "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight",
+            "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight",
+            "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight", "reg_convs.2.block.conv.weight"
+        ]
+
+        sections = []
+
+        for layer_name in combined_dict:
+            if layer_name in ignore_gates_for:
+                continue
+
+            includes = ("conv.weight", "rbr_1x1.bn.weight", "upsample_transpose.weight")
+            excludes = ("rbr_dense", "rbr_1x1.conv.weight")
+            if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes):
+                num_gates = combined_dict[layer_name].shape[0]
+                sections.append(num_gates)
+                print(f"✅ GATING: {start_bold}{layer_name:<50}{end_bold} Channels -> {num_gates}")
+
+        print(f"\nGate-able Layer's count {start_bold}{len(sections)}{end_bold} with total of {start_bold}{sum(sections)}{end_bold} Gates\n")
+
+        cumulativeGatesChannels = list(itertools.accumulate(sections))
+        num_filters = sum(sections) if channels_list else 0
+
         gater = GaterNetwork(
             feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
             num_features=512,

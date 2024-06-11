@@ -16,17 +16,17 @@ class GaterNetwork(nn.Module):
         self.relu1 = nn.ReLU()
 
         self.fc2 = nn.Linear(bottleneck_size, num_filters)
-        # self.bn2 = nn.BatchNorm1d(num_filters)
 
         self.sections = sections
-
-        self.enable_fixed_gates = False # default 
+        self.num_filter = num_filters
+        self.enable_fixed_gates = False
 
     def forward(self, x, training=False, epsilon=None):
+        CounterA.reset()
+        
         if self.enable_fixed_gates:
             return self.fixed_gates
         
-        CounterA.reset()
         # Feature extraction
         f = self.feature_extractor(x)
         f = torch.flatten(f, 1)

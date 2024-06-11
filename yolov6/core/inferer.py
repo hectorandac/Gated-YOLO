@@ -26,7 +26,7 @@ from PIL import Image
 from collections import defaultdict
 
 class Inferer:
-    def __init__(self, source, webcam, webcam_addr, weights, device, yaml, img_size, half):
+    def __init__(self, source, webcam, webcam_addr, weights, device, yaml, img_size, half, fixed_gates, enable_fixed_gates):
 
         self.__dict__.update(locals())
 
@@ -43,31 +43,10 @@ class Inferer:
 
         # Switch model to deploy status
         self.model_switch(self.model.model, self.img_size)
-        
-        ckpt = torch.load(weights, map_location=self.device)  # load
-        model = ckpt['ema' if ckpt.get('ema') else 'model'].float()
-        original_state_dict = model.state_dict()
-        new_state_dict = self.model.model.state_dict()
 
-        for dict_layer in new_state_dict:
-            if ".weight" in dict_layer:
-                layer_info = f"Deployment Layer: {dict_layer}"
-                loaded_shape_info = f"Loaded shape: {new_state_dict[dict_layer].shape}"
-                model_shape_info = ""
-                if dict_layer in original_state_dict:
-                    model_shape_info = f"New model shape: {original_state_dict[dict_layer].shape}"
-
-                print(f"{layer_info:80} {loaded_shape_info:60} {model_shape_info:40}")
-    
-        for dict_layer in original_state_dict:
-            if ".weight" in dict_layer:
-                layer_info = f"Layer: {dict_layer}"
-                loaded_shape_info = f"Loaded shape: {original_state_dict[dict_layer].shape}"
-                model_shape_info = ""
-                if dict_layer in new_state_dict:
-                    model_shape_info = f"New Model shape: {new_state_dict[dict_layer].shape}"
-
-                print(f"{layer_info:80} {loaded_shape_info:60} {model_shape_info:40}")
+        if enable_fixed_gates:
+            self.model.model.fixed_gates_enable = enable_fixed_gates
+            self.prune_weights(self.model.model, torch.load(fixed_gates))
 
         # Half precision
         if self.half & (self.device.type != 'cpu'):
@@ -76,14 +55,53 @@ class Inferer:
             self.model.model.float()
             self.half = False
 
-        #if self.device.type != 'cpu':
-        #    self.model(torch.zeros(1, 3, *self.img_size).to(self.device).type_as(next(self.model.model.parameters())))  # warmup
-
         # Load data
         self.webcam = webcam
         self.webcam_addr = webcam_addr
         self.files = LoadData(source, webcam, webcam_addr)
         self.source = source
+
+    def prune_weights(self, model, gates):
+        LOGGER.info("Pruning model for deployment")
+
+        ignore_gates_for = []
+
+        # Includes now allow both weights and biases
+        includes = (".weight", ".bias")
+        excludes = ("gater.", "detect.")  # Removed ".bias" from excludes to process biases
+
+        gate_index = 0
+
+        for layer_name, param in model.named_parameters():
+            if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes) and layer_name not in ignore_gates_for:
+                if gate_index < len(gates):
+                    LOGGER.info(f"Processing layer: {layer_name}")
+                    gate, _ = gates[gate_index]
+                    zeroed_channels = 0
+
+                    if ".weight" in layer_name:
+                        for i, keep in enumerate(gate.squeeze()):
+                            if not keep.item():
+                                param.data[i].zero_()
+                                if param.grad is not None:
+                                    param.grad.data[i].zero_()
+                                zeroed_channels += 1
+                        LOGGER.info(f"Zeroed {zeroed_channels}/{gate.numel()} channels in weight: {layer_name}")
+
+                    elif ".bias" in layer_name:
+                        for i, keep in enumerate(gate.squeeze()):
+                            if not keep.item():
+                                param.data[i].zero_()
+                                if param.grad is not None:
+                                    param.grad.data[i].zero_()
+                        LOGGER.info(f"Zeroed bias in layer: {layer_name}")
+                        gate_index += 1
+
+                    # Print the actual weights or biases after zeroing out unnecessary channels
+                    flattened_param = param.data.cpu().numpy()
+                    LOGGER.info(f"Parameters after pruning (flattened): {flattened_param.shape}")
+                else:
+                    LOGGER.warning(f"No gate found for layer: {layer_name}, skipping pruning for this layer")
 
 
     def model_switch(self, model, img_size):
@@ -99,20 +117,8 @@ class Inferer:
 
     def infer(
         self, conf_thres, iou_thres, classes, agnostic_nms, max_det, save_dir, save_txt, save_img, hide_labels, hide_conf, view_img=True,
-        analyze=False, enable_gater_net=False, fixed_gates=None, enable_fixed_gates=False):
+        analyze=False, enable_gater_net=False):
         ''' Model Inference and results visualization '''
-
-        if enable_gater_net and enable_fixed_gates:
-            self.model.model.gater.fixed_gates = torch.load(fixed_gates)
-        
-        #self.model.model.neck.enable_gater_net = enable_gater_net
-        #self.model.model.neck.enable_fixed_gates = enable_fixed_gates
-        
-        #self.model.model.backbone.enable_gater_net = enable_gater_net
-        #self.model.model.backbone.enable_fixed_gates = enable_fixed_gates
-
-        #self.model.model.gater.enable_gater_net = enable_gater_net
-        #self.model.model.gater.enable_fixed_gates = enable_fixed_gates
         
         vid_path, vid_writer, windows = None, None, []
         fps_calculator = CalcFPS()
@@ -144,7 +150,6 @@ class Inferer:
                     # Initialize gating_accumulator with the same shape as gating_decision, except for the batch dimension
                     gating_accumulator = [torch.zeros_like(gd[0].sum(dim=0, keepdim=True)) for gd in gating_decision]
                     base_dim = [gd[1] for gd in gating_decision]
-                    print(base_dim)
                 
                 for i, gd in enumerate(gating_decision):
                     # Sum gd over batch dimension while keeping the dimension
@@ -247,7 +252,7 @@ class Inferer:
                 else:
                     x_image = frame
             elif self.files.type == 'image':
-                x_image = img_src
+                x = img_src
 
             if enable_gater_net:
                 print("Getting gating_frequencies...")
@@ -255,24 +260,16 @@ class Inferer:
                 
                 for i, accumulator in enumerate(gating_accumulator):
                     # Normalize by the number of samples to get the frequency for this section
-                    gating_frequency = accumulator.squeeze() / 9180  # Ensure accumulator is correctly squeezed
-
-                    # Define thresholds
-                    threshold_completely_off = 0  # Gate is never active
-                    threshold_mostly_off = 0.3    # Gate is active less than 30% of the time
-                    threshold_always_on = 1       # Gate is always active
+                    gating_frequency = accumulator.squeeze() / 4944  # Ensure accumulator is correctly squeezed
 
                     # Identify gates below the threshold for this section
-                    completely_off_gates = (gating_frequency == threshold_completely_off)
-                    mostly_off_gates = (gating_frequency < threshold_mostly_off) & ~completely_off_gates
-                    always_on_gates = (gating_frequency == threshold_always_on)
+                    completely_off_gates = (gating_frequency == 0)
+                    always_on_gates = (gating_frequency > 0)
 
                     print(f"Section {i}:")
                     print(f"  Percentage of filters that are completely off: {completely_off_gates.float().mean() * 100:.2f}%")
-                    print(f"  Percentage of filters that are mostly off: {mostly_off_gates.float().mean() * 100:.2f}%")
                     print(f"  Percentage of filters that are always active: {always_on_gates.float().mean() * 100:.2f}%")
 
-                    # Check if "completely off" gates exceed 98%
                     if completely_off_gates.float().mean() > 0.99 and base_dim[i] is not None:
                         stored_gates.append([None, base_dim[i]])
                     else:
