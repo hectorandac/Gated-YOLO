@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.models as models
 from yolov6.layers.common import CounterA
 
 class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size, gtg_threshold = 0.0):
         super().__init__()
         # Feature extractor (E)
         self.feature_extractor = feature_extractor_arch(pretrained=False)
+        self.gtg_threshold = gtg_threshold
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
         self.fc1 = nn.Linear(num_features, bottleneck_size)
@@ -38,7 +38,6 @@ class GaterNetwork(nn.Module):
         
         # Real-valued vector before binarization
         g0 = self.fc2(f0)
-        # g0 = self.bn2(g0)
 
         closed_gates_percentage_beta = 0
         
@@ -48,14 +47,14 @@ class GaterNetwork(nn.Module):
             noise = torch.randn_like(g0) * epsilon
             g0_noisy = g0 + noise
             g_alpha = torch.clamp(1.2 * torch.sigmoid(g0_noisy) - 0.1, 0, 1)
-            g_beta = (g0_noisy > -0.9).float()
+            g_beta = (g0_noisy > self.gtg_threshold).float()
             g = g_beta + g_alpha - g_alpha.detach()
             
             closed_gates_percentage_beta = (g_beta == 0).float().mean().item() * 100
 
         else:
             # During inference, always use the binary gates
-            g = (g0 > -0.9).float()
+            g = (g0 > self.gtg_threshold).float()
 
         section_gates_list = []
         start_idx = 0

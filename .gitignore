@@ -125,3 +125,5 @@ gate_proportions.csv
 gating_analysis.png
 
 archive_runs/
+
+data/VOC/

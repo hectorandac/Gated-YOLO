@@ -157,6 +157,9 @@ def run(data,
                 verbose, do_coco_metric, do_pr_metric,
                 plot_curve, plot_confusion_matrix,
                 specific_shape=specific_shape,height=height, width=width)
+    
+    model = val.init_model(model, weights, task)
+    dataloader = val.init_data(dataloader, task)
 
     model.neck.enable_gater_net = enable_gater_net
     model.neck.enable_fixed_gates = enable_fixed_gates
@@ -165,9 +168,6 @@ def run(data,
     model.backbone.enable_gater_net = enable_gater_net
     model.backbone.enable_fixed_gates = enable_fixed_gates
     model.backbone.fixed_gates = fixed_gates
-    
-    model = val.init_model(model, weights, task)
-    dataloader = val.init_data(dataloader, task)
 
     # eval
     model.eval()

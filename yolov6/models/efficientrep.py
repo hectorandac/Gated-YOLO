@@ -144,9 +144,6 @@ class EfficientRep6(nn.Module):
         block=RepVGGBlock,
         fuse_P2=False,
         cspsppf=False,
-        num_features=204800,         # Number of output features from the feature extractor
-        bottleneck_size=128,         # Size of the bottleneck in the GaterNetwork
-        epsilon=1.0,                 # Standard deviation of Gaussian noise for Improved SemHash
     ):
         super().__init__()
 

@@ -41,4 +41,7 @@ RUN apt-get install -y libopenblas-base libopenmpi-dev libomp-dev libjpeg-dev zl
 RUN python3 -m pip install ./nvidia_tx2/torch-1.8.0-cp36-cp36m-linux_aarch64.whl    
 RUN python3 -m pip install ./nvidia_tx2/torchvision-0.9.0-cp36-cp36m-linux_aarch64.whl
 
+RUN python3 -m pip install seaborn
+RUN python3 -m pip install fvcore
+
 WORKDIR /root/myapp

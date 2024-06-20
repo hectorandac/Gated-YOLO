@@ -200,6 +200,7 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
             bottleneck_size=256,
             num_filters=num_filters,
             sections=cumulativeGatesChannels,
+            gtg_threshold=-0.6
         )
 
     return backbone, neck, head, gater

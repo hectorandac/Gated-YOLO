@@ -63,6 +63,7 @@ class Inferer:
 
     def prune_weights(self, model, gates):
         LOGGER.info("Pruning model for deployment")
+        model.fixed_gates = gates
 
         ignore_gates_for = []
 
@@ -76,8 +77,12 @@ class Inferer:
             if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes) and layer_name not in ignore_gates_for:
                 if gate_index < len(gates):
                     LOGGER.info(f"Processing layer: {layer_name}")
-                    gate, _ = gates[gate_index]
+                    gate, size = gates[gate_index]
                     zeroed_channels = 0
+
+                    if size != None:
+                        desired_shape = torch.Size([1, size[1], 1, 1])
+                        gate = torch.zeros(desired_shape, dtype=torch.bool)
 
                     if ".weight" in layer_name:
                         for i, keep in enumerate(gate.squeeze()):
@@ -243,7 +248,6 @@ class Inferer:
         if analyze:
             print("Analyzing detections")
             self.files = LoadData(self.source, self.webcam, self.webcam_addr)
-            x_image = None
             img_src, img_path, vid_cap = next(iter(self.files))
             if self.files.type == 'video':
                 ret, frame = vid_cap.read()
@@ -260,7 +264,7 @@ class Inferer:
                 
                 for i, accumulator in enumerate(gating_accumulator):
                     # Normalize by the number of samples to get the frequency for this section
-                    gating_frequency = accumulator.squeeze() / 4944  # Ensure accumulator is correctly squeezed
+                    gating_frequency = accumulator.squeeze() / 19120  # TODO: Ensure accumulator is correctly squeezed
 
                     # Identify gates below the threshold for this section
                     completely_off_gates = (gating_frequency == 0)
