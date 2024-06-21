@@ -122,11 +122,7 @@ class Trainer:
             self.model.module.backbone.enable_gater_net = args.enable_gater_net
             self.model.module.backbone.enable_fixed_gates = args.enable_fixed_gates
             self.model.module.backbone.fixed_gates = args.fixed_gates
-
-            if self.enable_gater_net:
-                self.model.module.gater.enable_gater_net = args.enable_gater_net
-                self.model.module.gater.enable_fixed_gates = args.enable_fixed_gates
-                self.model.module.gater.fixed_gates = args.fixed_gates
+            
         else:
             self.model.neck.enable_gater_net = args.enable_gater_net
             self.model.neck.enable_fixed_gates = args.enable_fixed_gates
@@ -135,11 +131,6 @@ class Trainer:
             self.model.backbone.enable_gater_net = args.enable_gater_net
             self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
             self.model.backbone.fixed_gates = args.fixed_gates
-
-            if self.enable_gater_net:
-                self.model.gater.enable_gater_net = args.enable_gater_net
-                self.model.gater.enable_fixed_gates = args.enable_fixed_gates
-                self.model.gater.fixed_gates = args.fixed_gates
 
         self.loss_num = 4 if args.enable_gater_net else 3
         self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])

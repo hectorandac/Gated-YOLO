@@ -65,9 +65,9 @@ data_aug = dict(
 )
 
 loss_weight = {
-    'class': 1.8,
+    'class': 3.0,
     'iou': 3.5,
     'dfl': 0.5,
-    'gtg': 0.45,
-    'gtg_decay': 0.25
+    'gtg': 0.2,
+    'gtg_decay': 1.7
 }

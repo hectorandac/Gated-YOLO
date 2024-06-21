@@ -77,17 +77,18 @@ class Detect(nn.Module):
             self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(), requires_grad=False)
 
     def forward(self, x, gating_decisions=None):
+        
         if self.training:
             cls_score_list = []
             reg_distri_list = []
 
             for i in range(self.nl):
-                x[i] = self.stems[i](x[i])
+                x[i] = self.stems[i](x[i], gating_decisions)
                 cls_x = x[i]
                 reg_x = x[i]
-                cls_feat = self.cls_convs[i](cls_x)
+                cls_feat = self.cls_convs[i](cls_x, gating_decisions)
+                reg_feat = self.reg_convs[i](reg_x, gating_decisions)
                 cls_output = self.cls_preds[i](cls_feat)
-                reg_feat = self.reg_convs[i](reg_x)
                 reg_output = self.reg_preds[i](reg_feat)
 
                 cls_output = torch.sigmoid(cls_output)
@@ -107,12 +108,14 @@ class Detect(nn.Module):
             for i in range(self.nl):
                 b, _, h, w = x[i].shape
                 l = h * w
-                x[i] = self.stems[i](x[i])
+                device = x[0].device
+                
+                x[i] = self.stems[i](x[i], gating_decisions)
                 cls_x = x[i]
                 reg_x = x[i]
-                cls_feat = self.cls_convs[i](cls_x)
+                cls_feat = self.cls_convs[i](cls_x, gating_decisions)
+                reg_feat = self.reg_convs[i](reg_x, gating_decisions)                
                 cls_output = self.cls_preds[i](cls_feat)
-                reg_feat = self.reg_convs[i](reg_x)
                 reg_output = self.reg_preds[i](reg_feat)
 
                 if self.use_dfl:

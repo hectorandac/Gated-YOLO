@@ -1,6 +1,6 @@
 # COCO 2017 dataset http://cocodataset.org
 train: dataset/images/train
-val: dataset/images/val
+val: dataset/images/vals
 test: dataset/images/test
 
 # number of classes

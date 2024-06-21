@@ -3,11 +3,34 @@ import torch.nn as nn
 import torchvision.models as models
 from yolov6.layers.common import CounterA
 
+class DimensionalityReduction(nn.Module):
+    def __init__(self, input_channels, bottleneck_size):
+        super(DimensionalityReduction, self).__init__()
+        self.conv1x1 = nn.Conv2d(input_channels, bottleneck_size, kernel_size=1)  # Bottleneck with 1x1 convolution
+        self.bn = nn.BatchNorm2d(bottleneck_size)
+        self.relu = nn.ReLU()
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))  # Global average pooling
+
+    def forward(self, x):
+        x = self.conv1x1(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        x = self.global_avg_pool(x)
+        return x
+
 class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size, gtg_threshold = 0.0):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size, gtg_threshold=-0.5, feature_extractors=None):
         super().__init__()
+        
         # Feature extractor (E)
-        self.feature_extractor = feature_extractor_arch(pretrained=False)
+        if feature_extractors != None:
+            self.feature_extractors = nn.ModuleList(feature_extractors)
+            self.feature_extractor = None
+        else:
+            self.feature_extractor = feature_extractor_arch(pretrained=False)
+            self.feature_extractors = None
+
+
         self.gtg_threshold = gtg_threshold
         
         # Fully-connected layers with bottleneck (D) and Adaptive Pooling
@@ -28,8 +51,20 @@ class GaterNetwork(nn.Module):
             return self.fixed_gates
         
         # Feature extraction
-        f = self.feature_extractor(x)
-        f = torch.flatten(f, 1)
+        if self.feature_extractors == None:
+            f = self.feature_extractor(x)
+            f = torch.flatten(f, 1)
+        else:
+            combined_features = []
+        
+            for input_tensor, feature_extractor in zip(x, self.feature_extractors):
+                # Feature extraction
+                f = feature_extractor(input_tensor)
+                f = torch.flatten(f, 1)
+                combined_features.append(f)
+            
+            # Concatenate all extracted features
+            f = torch.cat(combined_features, dim=1)
         
         # Bottleneck mapping
         f0 = self.fc1(f)
@@ -74,16 +109,16 @@ class GaterNetwork(nn.Module):
     
     @staticmethod
     def create_feature_extractor_resnet101(pretrained=True):
-        # For example, use ResNet18 as the base model
         model = models.resnet101(pretrained=pretrained)
-        # Remove the final fully connected layer (classifier)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
         return feature_extractor
     
     @staticmethod
     def create_feature_extractor_resnet18(pretrained=True):
-        # For example, use ResNet18 as the base model
         model = models.resnet18(pretrained=pretrained)
-        # Remove the final fully connected layer (classifier)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
         return feature_extractor
+    
+    @staticmethod
+    def dimensionality_reduction(input_channels, bottleneck_size):
+        return DimensionalityReduction(input_channels, bottleneck_size)

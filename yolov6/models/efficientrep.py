@@ -241,8 +241,6 @@ class EfficientRep6(nn.Module):
         )
 
     def forward(self, x):
-        ori = x
-
         outputs = []
         x = self.stem(x)
         x = self.ERBlock_2(x)
@@ -257,7 +255,7 @@ class EfficientRep6(nn.Module):
         x = self.ERBlock_6(x)
         outputs.append(x)
 
-        return tuple(outputs), ori
+        return tuple(outputs)
 
 class CSPBepBackbone(nn.Module):
     """
