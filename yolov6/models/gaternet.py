@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from yolov6.layers.common import CounterA
+from yolov6.tools.models.darknet import Darknet53
+from yolov6.tools.models.darknet import DarkResidualBlock
 
 class DimensionalityReduction(nn.Module):
     def __init__(self, input_channels, bottleneck_size):
@@ -27,7 +29,7 @@ class GaterNetwork(nn.Module):
             self.feature_extractors = nn.ModuleList(feature_extractors)
             self.feature_extractor = None
         else:
-            self.feature_extractor = feature_extractor_arch(pretrained=False)
+            self.feature_extractor, self.fe_last_layer = feature_extractor_arch(pretrained=False)
             self.feature_extractors = None
 
 
@@ -46,6 +48,8 @@ class GaterNetwork(nn.Module):
 
     def forward(self, x, training=False, epsilon=None):
         CounterA.reset()
+
+        f_out = None
         
         if self.enable_fixed_gates:
             return self.fixed_gates
@@ -53,6 +57,7 @@ class GaterNetwork(nn.Module):
         # Feature extraction
         if self.feature_extractors == None:
             f = self.feature_extractor(x)
+            f_out = self.fe_last_layer(f.view(-1, 1024))
             f = torch.flatten(f, 1)
         else:
             combined_features = []
@@ -97,7 +102,7 @@ class GaterNetwork(nn.Module):
             section_gates_list.append([g[:, start_idx:end_idx].unsqueeze(-1).unsqueeze(-1), None])
             start_idx = end_idx
         
-        return section_gates_list, closed_gates_percentage_beta
+        return section_gates_list, closed_gates_percentage_beta, f_out
     
     def freeze(self):
         for param in self.parameters():
@@ -111,13 +116,22 @@ class GaterNetwork(nn.Module):
     def create_feature_extractor_resnet101(pretrained=True):
         model = models.resnet101(pretrained=pretrained)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
-        return feature_extractor
+        last_layer = nn.Sequential(*list(model.children())[-1:])
+        return feature_extractor, last_layer
     
     @staticmethod
     def create_feature_extractor_resnet18(pretrained=True):
         model = models.resnet18(pretrained=pretrained)
         feature_extractor = nn.Sequential(*list(model.children())[:-1])
-        return feature_extractor
+        last_layer = nn.Sequential(*list(model.children())[-1:])
+        return feature_extractor, last_layer
+    
+    @staticmethod
+    def create_feature_extractor_darknet53(pretrained=False):
+        model = Darknet53(DarkResidualBlock, num_classes=5)
+        feature_extractor = nn.Sequential(*list(model.children())[:-1])
+        last_layer = nn.Sequential(*list(model.children())[-1:])
+        return feature_extractor, last_layer
     
     @staticmethod
     def dimensionality_reduction(input_channels, bottleneck_size):

@@ -132,8 +132,8 @@ class Trainer:
             self.model.backbone.enable_fixed_gates = args.enable_fixed_gates
             self.model.backbone.fixed_gates = args.fixed_gates
 
-        self.loss_num = 4 if args.enable_gater_net else 3
-        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss'] if args.enable_gater_net else [])
+        self.loss_num = 5 if args.enable_gater_net else 3
+        self.loss_info = ['Epoch', 'lr', 'iou_loss', 'dfl_loss', 'cls_loss'] + (['gtg_loss', 'scn_loss'] if args.enable_gater_net else [])
 
         if self.args.distill:
             self.loss_num += 1
@@ -182,7 +182,7 @@ class Trainer:
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
-            preds, gates, s_featmaps, closed_gates_percentage = self.model(images)
+            preds, gates, s_featmaps, closed_gates_percentage, f_out = self.model(images)
 
             allowed_closed_gates = min(max(10 * (epoch_num // 10), 40), 100)
             if self.enable_gater_net and closed_gates_percentage > allowed_closed_gates and self.flag_stop_gates == False:
@@ -205,7 +205,7 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, gates) # YOLOv6_af
+                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, gates, f_out) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size

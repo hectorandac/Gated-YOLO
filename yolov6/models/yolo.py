@@ -45,17 +45,19 @@ class Model(nn.Module):
         gating_decisions_a = None
         gating_decisions_b = None
         gating_decisions_c = None
+
+        f_out = None
         
         if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_a, closed_gates_percentage_a = self.gater_b(x, training=self.training, epsilon=1.0 if self.training else 0)
+            gating_decisions_a, closed_gates_percentage_a, f_out = self.gater_b(x, training=self.training, epsilon=1.0 if self.training else 0)
         x = self.backbone(x, gating_decisions_a)
 
         if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_b, closed_gates_percentage_b = self.gater_n(x, training=self.training, epsilon=1.0 if self.training else 0)
+            gating_decisions_b, closed_gates_percentage_b, _f_out = self.gater_n(x, training=self.training, epsilon=1.0 if self.training else 0)
         x = self.neck(x, gating_decisions_b)
 
         if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_c, closed_gates_percentage_c = self.gater_h(x, training=self.training, epsilon=1.0 if self.training else 0)
+            gating_decisions_c, closed_gates_percentage_c, _f_out = self.gater_h(x, training=self.training, epsilon=1.0 if self.training else 0)
 
         if not export_mode:
             featmaps = []
@@ -64,7 +66,7 @@ class Model(nn.Module):
             x = self.detect(x, gating_decisions_c)
             gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
             closed_gates_percentage = (closed_gates_percentage_a + closed_gates_percentage_b + closed_gates_percentage_c) / 3
-            return x, gating_decisions, featmaps, closed_gates_percentage
+            return x, gating_decisions, featmaps, closed_gates_percentage, f_out
         else:
             x = self.detect(x, gating_decisions_c)
             gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
@@ -223,8 +225,8 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
 
         # Define GaterNetwork for each sub-network
         gater_backbone = GaterNetwork(
-            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
-            num_features=512,
+            feature_extractor_arch=GaterNetwork.create_feature_extractor_darknet53,
+            num_features=1024,
             bottleneck_size=256,
             num_filters=sum(backbone_sections),
             sections=cumulative_backbone_gates,
