@@ -187,7 +187,7 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
             "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight",
             "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight",
             "stems.2.block.conv.weight", "cls_convs.2.block.conv.weight", "reg_convs.2.block.conv.weight",
-            "proj_conv.weight", ""
+            "proj_conv.weight"
         ]
 
         # Function to calculate gateable layers and sections
