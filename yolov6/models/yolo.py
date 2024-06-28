@@ -182,7 +182,7 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
 
         # Define gate-able layers
         includes = ("conv.weight", "rbr_1x1.bn.weight", "upsample_transpose.weight")
-        excludes = ("rbr_dense", "rbr_1x1.conv.weight")
+        excludes = ("rbr_dense", "rbr_1x1.conv.weight", "proj_conv.weight")
         ignore_gates_for = [
             "stems.0.block.conv.weight", "cls_convs.0.block.conv.weight", "reg_convs.0.block.conv.weight",
             "stems.1.block.conv.weight", "cls_convs.1.block.conv.weight", "reg_convs.1.block.conv.weight",
