@@ -20,6 +20,15 @@ class_to_group = {
     1: 4, 5: 4, 6: 4, 13: 4     # Group 5
 }
 
+# Define the new loss functions
+def annealing_sparsity_loss(gate_values, target_sparsity, epoch, total_epochs):
+    current_sparsity = target_sparsity * (epoch / total_epochs)
+    sparsity = torch.mean(gate_values)
+    return F.mse_loss(sparsity, torch.tensor(current_sparsity, dtype=sparsity.dtype, device=sparsity.device))
+
+def soft_threshold(gate_values, target_sparsity):
+    threshold = torch.quantile(gate_values, target_sparsity)
+    return (gate_values > threshold).float() * gate_values
 class ComputeLoss:
     '''Loss computation func.'''
     def __init__(self,
@@ -193,28 +202,19 @@ class ComputeLoss:
         # Compute the gating loss
         gating_loss = None
         if gating_decision is not None:
-
-            filtered_class_labels_per_batch = [
-                torch.unique(item[item != self.num_classes]) for item in target_labels
-            ]
-
             g_reconstructed = torch.cat([gd[0].flatten(start_dim=1) for gd in gating_decision], dim=1)
+
+            #print(g_reconstructed.shape)
+            #print(g_reconstructed[0][0:10])
             
-            class_to_gates_mapping_per_image = []
-
-            for i, class_labels in enumerate(filtered_class_labels_per_batch):
-                class_to_gates = {}
-                
-                for class_label in class_labels:
-                    active_gates = (g_reconstructed[i] > 0).nonzero(as_tuple=False).squeeze(1)
-                    class_to_gates[class_label.item()] = active_gates.tolist()
-
-                class_to_gates_mapping_per_image.append(class_to_gates)
-
-            gating_loss = g_reconstructed.mean(dim=1).mean()
-            gating_loss = gating_loss * (self.loss_weight['gtg'] / (1 + self.loss_weight['gtg_decay']  * epoch_num))
+            # Replace L1 based loss with the new annealing sparsity loss
+            gating_loss = annealing_sparsity_loss(g_reconstructed, 0.4, epoch_num, 400)
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
+            
+            # Enable soft gating towards the end of training (last 10% of epochs)
+            if epoch_num > 400 * 0.9:
+                g_reconstructed.data = soft_threshold(g_reconstructed.data, 0.4)
 
             if f_out is not None:
                 subgroup_idx = self.determine_dominant_subgroup(target_labels)
@@ -225,41 +225,6 @@ class ComputeLoss:
 
         return loss, torch.cat(loss_components).detach()
     
-    def calculate_gate_diversity_loss(gate_class_associations, detected_classes, similarity_threshold=0.5):
-        """
-        Calculates the diversity loss based on gate activations and associated detected classes.
-
-        :param gate_class_associations: A tensor indicating the association between gates and classes.
-                                        Shape: [num_gates, num_classes]
-        :param detected_classes: A list or tensor of classes detected in the current batch.
-        :param similarity_threshold: A threshold to determine if gate activation patterns are too similar.
-        :return: A scalar tensor representing the diversity loss.
-        """
-        # Initialize diversity loss
-        diversity_loss = 0.0
-
-        # Calculate pairwise similarity between gate activation patterns for each class
-        num_classes = gate_class_associations.shape[1]
-        for i in range(num_classes):
-            for j in range(i + 1, num_classes):
-                # Only consider pairs of classes that were detected
-                if i in detected_classes and j in detected_classes:
-                    # Calculate similarity (this example uses cosine similarity, but you can choose another metric)
-                    similarity = torch.nn.functional.cosine_similarity(
-                        gate_class_associations[:, i].unsqueeze(0),
-                        gate_class_associations[:, j].unsqueeze(0)
-                    )
-                    
-                    # If similarity is above the threshold, add to the loss
-                    if similarity > similarity_threshold:
-                        diversity_loss += similarity
-
-        # Normalize the loss by the number of comparisons
-        num_comparisons = (num_classes * (num_classes - 1)) / 2
-        diversity_loss /= num_comparisons
-
-        return diversity_loss
-
     def preprocess(self, targets, batch_size, scale_tensor):
         targets_list = np.zeros((batch_size, 1, 5)).tolist()
         for i, item in enumerate(targets.cpu().numpy().tolist()):

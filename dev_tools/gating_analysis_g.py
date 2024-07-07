@@ -2,74 +2,131 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+import os
+import csv
 
 parser = argparse.ArgumentParser(description='Analyze and visualize gating decisions.')
-parser.add_argument('path', type=str, help='Path to the .pt file containing gating decisions.')
+parser.add_argument('paths', type=str, nargs='+', help='Paths to the .pt files containing gating decisions.')
 args = parser.parse_args()
 
-gating_decisions = torch.load(args.path)
+def analyze_gating_decisions(path):
+    gating_decisions = torch.load(path)
+    specific_gate_analysis = []
 
-specific_gate_analysis = []
-for i, section_gates in enumerate(gating_decisions):
-    if section_gates[0] is None:
-        specific_gate_analysis.append({'layer': i+1, 'status': 'blocked'})
-        continue
-    
-    section_gates_float = section_gates[0].float()
-    gating_frequency = section_gates_float.mean(dim=0).cpu()
-    
-    completely_off_indices = torch.where(gating_frequency == 0)[0].tolist()
-    always_on_indices = torch.where(gating_frequency == 1)[0].tolist()
-    partially_active_indices = torch.where((gating_frequency > 0) & (gating_frequency < 1))[0].tolist()
-
-    specific_gate_analysis.append({
-        'layer': i+1,
-        'completely_off': completely_off_indices,
-        'always_on': always_on_indices,
-        'partially_active': partially_active_indices
-    })
-
-for analysis in specific_gate_analysis:
-    layer = analysis['layer']
-    if 'status' in analysis and analysis['status'] == 'blocked':
-        print(f"Layer {layer}:\nBlocked")
-    else:
-        off_gates = ', '.join(map(str, analysis['completely_off']))
-        on_gates = ', '.join(map(str, analysis['always_on']))
-        partial_gates = ', '.join(map(str, analysis['partially_active']))
-        print(f"Layer {layer}:\nCompletely Off Gates: [{off_gates}]\nAlways On Gates: [{on_gates}]\nPartially active: [{partial_gates}]")
-
-
-num_layers = max([a['layer'] for a in specific_gate_analysis])
-num_gates = max([max(a['always_on'] + a['completely_off'], default=0) for a in specific_gate_analysis if 'status' not in a], default=0) + 1
-gate_status_matrix = np.full((num_layers, num_gates), 0.5)
-
-for analysis in specific_gate_analysis:
-    layer_idx = analysis['layer'] - 1
-    if 'status' in analysis and analysis['status'] == 'blocked':
-        gate_status_matrix[layer_idx, :] = 0.5
-    else:
-        for gate in analysis['always_on']:
-            gate_status_matrix[layer_idx, gate] = 1
+    for i, section_gates in enumerate(gating_decisions):
+        if section_gates[0] is None:
+            total_capacity = section_gates[1].numel()
+            specific_gate_analysis.append({
+                'layer': i+1, 
+                'status': 'blocked', 
+                'completely_off': 100, 
+                'num_gates': 0,
+                'off_indices': set(),
+                'total_capacity': total_capacity
+            })
+            continue
         
-        for gate in analysis['completely_off']:
-            gate_status_matrix[layer_idx, gate] = 0
+        section_gates_float = section_gates[0].float()
+        gating_frequency = section_gates_float.mean(dim=0).cpu()
+        total_capacity = section_gates_float.numel()
+        
+        completely_off_indices = torch.where(gating_frequency == 0)[0].tolist()
+        
+        specific_gate_analysis.append({
+            'layer': i+1,
+            'completely_off': len(completely_off_indices) / total_capacity * 100,
+            'num_gates': len(completely_off_indices),
+            'off_indices': set(completely_off_indices),
+            'total_capacity': total_capacity
+        })
+    
+    return specific_gate_analysis
 
-# Plotting the gate status matrix
-plt.figure(figsize=(12, 8))
-plt.imshow(gate_status_matrix, aspect='auto', cmap='RdYlGn', interpolation='none')
-plt.colorbar(label='Gate Status', ticks=[0, 0.5, 1], format=plt.FuncFormatter(lambda val, loc: {0: 'Always Off', 0.5: 'Variable', 1: 'Always On'}[val]))
-plt.xlabel('Gate Index')
-plt.ylabel('Layer Number')
-plt.title('Gate Activation Status Across Layers')
+def calculate_percentages(gate_analysis):
+    percentages = {'completely_off': []}
+    for analysis in gate_analysis:
+        if 'status' in analysis and analysis['status'] == 'blocked':
+            percentages['completely_off'].append(100)
+        else:
+            percentages['completely_off'].append(analysis['completely_off'])
+    return percentages
 
-# Adjust ticks if necessary based on your number of gates and layers
-plt.xticks(range(0, num_gates, max(1, num_gates // 10)))  # Show every 10th gate index if many gates
-plt.yticks(range(num_layers))
+def plot_gate_percentages(percentages_list, paths):
+    layers = list(range(1, len(percentages_list[0]['completely_off']) + 1))
+    plt.figure(figsize=(10, 6))
+    for i, percentages in enumerate(percentages_list):
+        dir_name = os.path.basename(os.path.dirname(paths[i]))
+        plt.plot(layers, percentages['completely_off'], label=f'{dir_name} - Completely Off')
+    
+    plt.xlabel('Layer Number')
+    plt.ylabel('Percentage of Gates Completely Off')
+    plt.title('Percentage of Completely Off Gates Across Layers')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('completely_off_gates_percentages.png', dpi=300)
+    plt.show()
 
-plt.tight_layout()
+def plot_gate_differences(analyses, paths):
+    if len(analyses) > 1:
+        layers = list(range(1, len(analyses[0]) + 1))
+        plt.figure(figsize=(10, 6))
+        for i in range(1, len(analyses)):
+            differences = []
+            for layer in range(len(analyses[0])):
+                off_indices_i = analyses[i][layer]['off_indices']
+                off_indices_i_1 = analyses[i-1][layer]['off_indices']
+                diff_gates = off_indices_i.symmetric_difference(off_indices_i_1)
+                total_capacity = analyses[i][layer]['total_capacity']
+                differences.append(len(diff_gates) / total_capacity * 100)
+            dir_name_1 = os.path.basename(os.path.dirname(paths[i-1]))
+            dir_name_2 = os.path.basename(os.path.dirname(paths[i]))
+            plt.plot(layers, differences, label=f'Differences {dir_name_1} vs {dir_name_2}')
+        
+        plt.xlabel('Layer Number')
+        plt.ylabel('Percentage of Different Closed Gates')
+        plt.title('Percentage of Different Closed Gates Between Models')
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig('gate_differences.png', dpi=300)
+        plt.show()
 
-# Save the figure before showing it
-plt.savefig('gates_status_visualization.png', dpi=300)
+def save_percentages_to_csv(percentages_list, paths):
+    layers = list(range(1, len(percentages_list[0]['completely_off']) + 1))
+    with open('percentages_of_closed_gates.csv', mode='w', newline='') as file:
+        writer = csv.writer(file)
+        header = ['Layer'] + [os.path.basename(os.path.dirname(path)) for path in paths]
+        writer.writerow(header)
+        for layer in layers:
+            row = [layer] + [percentages['completely_off'][layer-1] for percentages in percentages_list]
+            writer.writerow(row)
 
-plt.show()
+def save_differences_to_csv(analyses, paths):
+    if len(analyses) > 1:
+        layers = list(range(1, len(analyses[0]) + 1))
+        with open('differences_in_closed_gates.csv', mode='w', newline='') as file:
+            writer = csv.writer(file)
+            header = ['Layer'] + [f'Diff {os.path.basename(os.path.dirname(paths[i-1]))} vs {os.path.basename(os.path.dirname(paths[i]))}' for i in range(1, len(paths))]
+            writer.writerow(header)
+            for layer in layers:
+                row = [layer]
+                for i in range(1, len(analyses)):
+                    off_indices_i = analyses[i][layer-1]['off_indices']
+                    off_indices_i_1 = analyses[i-1][layer-1]['off_indices']
+                    diff_gates = off_indices_i.symmetric_difference(off_indices_i_1)
+                    total_capacity = analyses[i][layer-1]['total_capacity']
+                    row.append(len(diff_gates) / total_capacity * 100)
+                writer.writerow(row)
+
+all_percentages = []
+all_analyses = []
+
+for path in args.paths:
+    gate_analysis = analyze_gating_decisions(path)
+    all_analyses.append(gate_analysis)
+    percentages = calculate_percentages(gate_analysis)
+    all_percentages.append(percentages)
+
+plot_gate_percentages(all_percentages, args.paths)
+plot_gate_differences(all_analyses, args.paths)
+save_percentages_to_csv(all_percentages, args.paths)
+save_differences_to_csv(all_analyses, args.paths)

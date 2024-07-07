@@ -69,21 +69,46 @@ class Inferer:
 
         # Includes now allow both weights and biases
         includes = (".weight", ".bias")
-        excludes = ("gater.", "detect.")  # Removed ".bias" from excludes to process biases
+        excludes = ("gater.", "gater_b.", "gater_n.", "gater_h.", "proj_conv.", 
+                    "rbr_dense", "rbr_1x1.conv")  # Removed ".bias" from excludes to process biases
 
         gate_index = 0
+        sequence = [0, 3, 3, -5, 3, 3, -5, 3, 3]
+        seq_pos = 0
+        use_sequence = False
 
         for layer_name, param in model.named_parameters():
             if any(include in layer_name for include in includes) and not any(exclude in layer_name for exclude in excludes) and layer_name not in ignore_gates_for:
                 if gate_index < len(gates):
-                    LOGGER.info(f"Processing layer: {layer_name}")
+                    if layer_name.startswith("detect"):
+                        print("")
+                        LOGGER.info(f"Processing layer: {layer_name}")
+                        
+                        # Start using the sequence when processing stems.0.block
+                        use_sequence = True
+
+                        # Update gate index based on the sequence
+                        if use_sequence and seq_pos < len(sequence):
+                            gate_index = gate_index + sequence[seq_pos]
+                            if ".bias" in layer_name:
+                                seq_pos += 1
+                        else:
+                            gate_index += 1  # Fallback to sequential increment if sequence is exhausted
+
+                        if gate_index >= len(gates):
+                            LOGGER.warning(f"No gate found for layer: {layer_name}, skipping pruning for this layer")
+                            continue
+                    else:
+                        LOGGER.info(f"Processing layer: {layer_name}")
+
                     gate, size = gates[gate_index]
                     zeroed_channels = 0
 
-                    if size != None:
+                    if size is not None:
                         desired_shape = torch.Size([1, size[1], 1, 1])
                         gate = torch.zeros(desired_shape, dtype=torch.bool)
 
+                    #print(gate.shape)
                     if ".weight" in layer_name:
                         for i, keep in enumerate(gate.squeeze()):
                             if not keep.item():
@@ -100,13 +125,15 @@ class Inferer:
                                 if param.grad is not None:
                                     param.grad.data[i].zero_()
                         LOGGER.info(f"Zeroed bias in layer: {layer_name}")
-                        gate_index += 1
+                        if not layer_name.startswith("stems.0.block"):
+                            gate_index += 1
 
                     # Print the actual weights or biases after zeroing out unnecessary channels
                     flattened_param = param.data.cpu().numpy()
                     LOGGER.info(f"Parameters after pruning (flattened): {flattened_param.shape}")
                 else:
                     LOGGER.warning(f"No gate found for layer: {layer_name}, skipping pruning for this layer")
+
 
 
     def model_switch(self, model, img_size):
@@ -264,7 +291,7 @@ class Inferer:
                 
                 for i, accumulator in enumerate(gating_accumulator):
                     # Normalize by the number of samples to get the frequency for this section
-                    gating_frequency = accumulator.squeeze() / 19120  # TODO: Ensure accumulator is correctly squeezed
+                    gating_frequency = accumulator.squeeze() / 11232  # TODO: Ensure accumulator is correctly squeezed
 
                     # Identify gates below the threshold for this section
                     completely_off_gates = (gating_frequency == 0)
@@ -288,11 +315,6 @@ class Inferer:
 
                 print("Storing gates in to gates.pt")
                 torch.save(stored_gates, f"{save_dir}/gates.pt")
-
-
-            
-            # annotations = self.parse_yolo_annotations(txt_path + '.txt')
-            # heat_maps = self.generate_heatmap(annotations, x_image.shape[1], x_image.shape[0], save_dir + '/heatmap.png', 64000)
             
             img, img_src = self.process_image(img_src, self.img_size, self.stride, self.half)
             img = img.to(self.device)

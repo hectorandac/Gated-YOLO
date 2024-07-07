@@ -38,6 +38,29 @@ class Model(nn.Module):
         # Init weights
         initialize_weights(self)
 
+    def forward_bb(self, x):
+        export_mode = torch.onnx.is_in_onnx_export() or self.export
+        closed_gates_percentage = 0
+
+        gating_decisions_a = None
+        gating_decisions_b = None
+        gating_decisions_c = None
+
+        f_out = None
+
+        if not export_mode:
+            featmaps = []
+            featmaps.extend(x)
+        if self.training:
+            x = self.detect(x, gating_decisions_c)
+            #gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
+            #closed_gates_percentage = (closed_gates_percentage_a + closed_gates_percentage_b + closed_gates_percentage_c) / 3
+            return x, featmaps, closed_gates_percentage, f_out
+        else:
+            x = self.detect(x, gating_decisions_c)
+            #gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
+            return x
+
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
         closed_gates_percentage = 0
