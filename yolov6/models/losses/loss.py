@@ -21,8 +21,7 @@ class_to_group = {
 }
 
 # Define the new loss functions
-def annealing_sparsity_loss(gate_values, target_sparsity, epoch, total_epochs):
-    current_sparsity = 1 - (target_sparsity * (epoch / total_epochs))
+def annealing_sparsity_loss(gate_values, current_sparsity):
     sparsity = torch.mean(gate_values)
     # print("######################", current_sparsity, sparsity)
     return F.mse_loss(sparsity, torch.tensor(current_sparsity, dtype=sparsity.dtype, device=sparsity.device))
@@ -209,7 +208,9 @@ class ComputeLoss:
             #print(g_reconstructed[0][0:10])
             
             # Replace L1 based loss with the new annealing sparsity loss
-            gating_loss = annealing_sparsity_loss(g_reconstructed, 0.4, epoch_num, 400)
+
+            target_loss = 1 - (0.4 * (epoch_num / 400))
+            gating_loss = annealing_sparsity_loss(g_reconstructed, target_loss)
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
             
@@ -224,7 +225,7 @@ class ComputeLoss:
                 loss += subgroup_loss
                 loss_components.append(subgroup_loss.unsqueeze(0))
 
-        return loss, torch.cat(loss_components).detach()
+        return loss, torch.cat(loss_components).detach(), target_loss
     
     def preprocess(self, targets, batch_size, scale_tensor):
         targets_list = np.zeros((batch_size, 1, 5)).tolist()

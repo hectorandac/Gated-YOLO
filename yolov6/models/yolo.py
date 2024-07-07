@@ -248,8 +248,8 @@ def build_network(config, channels, num_classes, num_layers, fuse_ab=False, dist
 
         # Define GaterNetwork for each sub-network
         gater_backbone = GaterNetwork(
-            feature_extractor_arch=GaterNetwork.create_feature_extractor_darknet53,
-            num_features=1024,
+            feature_extractor_arch=GaterNetwork.create_feature_extractor_resnet18,
+            num_features=512,
             bottleneck_size=256,
             num_filters=sum(backbone_sections),
             sections=cumulative_backbone_gates,

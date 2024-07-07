@@ -57,7 +57,7 @@ class GaterNetwork(nn.Module):
         # Feature extraction
         if self.feature_extractors == None:
             f = self.feature_extractor(x)
-            f_out = self.fe_last_layer(f.view(-1, 1024))
+            f_out = self.fe_last_layer(f.view(-1, 512))
             f = torch.flatten(f, 1)
         else:
             combined_features = []

@@ -161,9 +161,9 @@ class Trainer:
         print_detail = True
         try:
             for self.step, self.batch_data in self.pbar:
-                self.last_g_percetage = self.train_in_steps(epoch_num, self.step)
+                self.last_g_percentage, desired_target = self.train_in_steps(epoch_num, self.step)
                 if print_detail:
-                    print(f"Gates signal (g_beta): {self.last_g_percetage:.2f}%")
+                    print(f"Closed percentage (g_beta): {self.last_g_percentage:.2f}% | Target: {(1 - desired_target):.2f}%")
                     print_detail = False
                 self.print_details()
         except Exception as _:
@@ -179,6 +179,7 @@ class Trainer:
             write_tbimg(self.tblogger, self.vis_train_batch, self.step + self.max_stepnum * self.epoch, type='train')
 
         closed_gates_percentage = 0
+        target_loss = 0
         # forward
         with amp.autocast(enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
@@ -205,7 +206,7 @@ class Trainer:
                 total_loss += total_loss_ab
                 loss_items += loss_items_ab
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num, gates, f_out) # YOLOv6_af
+                total_loss, loss_items, target_loss = self.compute_loss(preds, targets, epoch_num, step_num, gates, f_out) # YOLOv6_af
 
             if self.rank != -1:
                 total_loss *= self.world_size
@@ -214,7 +215,7 @@ class Trainer:
         self.scaler.scale(total_loss).backward()
         self.loss_items = loss_items
         self.update_optimizer()
-        return closed_gates_percentage
+        return closed_gates_percentage, target_loss
 
     def after_epoch(self):
         lrs_of_this_epoch = [x['lr'] for x in self.optimizer.param_groups]
@@ -256,7 +257,7 @@ class Trainer:
             self.evaluate_results = list(self.evaluate_results)
 
             # log for tensorboard
-            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss, self.last_g_percetage)
+            write_tblog(self.tblogger, self.epoch, self.evaluate_results, lrs_of_this_epoch, self.mean_loss, self.last_g_percentage)
             # save validation predictions to tensorboard
             write_tbimg(self.tblogger, self.vis_imgs_list, self.epoch, type='val')
 
