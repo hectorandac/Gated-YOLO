@@ -163,7 +163,7 @@ class Trainer:
             for self.step, self.batch_data in self.pbar:
                 self.last_g_percentage, desired_target = self.train_in_steps(epoch_num, self.step)
                 if print_detail:
-                    print(f"Closed percentage (g_beta): {self.last_g_percentage:.2f}% | Target: {(1 - desired_target):.2f}%")
+                    print(f"Closed percentage (g_beta): {self.last_g_percentage:.2f}% | Target: {(1 - desired_target):.5f}%")
                     print_detail = False
                 self.print_details()
         except Exception as _:
