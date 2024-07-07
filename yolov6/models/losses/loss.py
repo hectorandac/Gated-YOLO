@@ -22,8 +22,9 @@ class_to_group = {
 
 # Define the new loss functions
 def annealing_sparsity_loss(gate_values, target_sparsity, epoch, total_epochs):
-    current_sparsity = target_sparsity * (epoch / total_epochs)
+    current_sparsity = 1 - (target_sparsity * (epoch / total_epochs))
     sparsity = torch.mean(gate_values)
+    # print("######################", current_sparsity, sparsity)
     return F.mse_loss(sparsity, torch.tensor(current_sparsity, dtype=sparsity.dtype, device=sparsity.device))
 
 def soft_threshold(gate_values, target_sparsity):

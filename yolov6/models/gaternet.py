@@ -21,7 +21,7 @@ class DimensionalityReduction(nn.Module):
         return x
 
 class GaterNetwork(nn.Module):
-    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size, gtg_threshold=-0.5, feature_extractors=None):
+    def __init__(self, feature_extractor_arch, num_features, num_filters, sections, bottleneck_size, gtg_threshold=-2, feature_extractors=None):
         super().__init__()
         
         # Feature extractor (E)
