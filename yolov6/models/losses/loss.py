@@ -209,7 +209,7 @@ class ComputeLoss:
             
             # Replace L1 based loss with the new annealing sparsity loss
 
-            target_loss = 1 - (0.4 * (epoch_num / 400))
+            target_loss = 1 - 0.4
             gating_loss = annealing_sparsity_loss(g_reconstructed, target_loss)
             loss += gating_loss
             loss_components.append(gating_loss.unsqueeze(0))
