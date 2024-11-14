@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import math
 import torch
-from torch.cuda import amp
+from torch import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
@@ -160,7 +160,7 @@ class Trainer:
             write_tbimg(self.tblogger, self.vis_train_batch, self.step + self.max_stepnum * self.epoch, type='train')
 
         # forward
-        with amp.autocast(enabled=self.device != 'cpu'):
+        with amp.autocast('cuda', enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
             preds, gates, s_featmaps = self.model(images)
 
@@ -432,7 +432,7 @@ class Trainer:
             assert not self.args.distill, 'ERROR in: YOLOv6-lite models not support distill mode.'
             model = build_lite_model(cfg, nc, device)
         else:
-            model = build_model(cfg, nc, device, fuse_ab=self.args.fuse_ab, distill_ns=self.distill_ns, enable_gater_net=args.enable_gater_net)
+            model = build_model(cfg, nc, device, fuse_ab=self.args.fuse_ab, distill_ns=self.distill_ns)
         weights = cfg.model.pretrained
         if weights:  # finetune if pretrained model is set
             if not os.path.exists(weights):
