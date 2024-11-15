@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import math
 import torch
-from torch.cuda import amp
+from torch import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
@@ -181,7 +181,7 @@ class Trainer:
         closed_gates_percentage = 0
         target_loss = 0
         # forward
-        with amp.autocast(enabled=self.device != 'cpu'):
+        with amp.autocast('cuda', enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
             preds, gates, s_featmaps, closed_gates_percentage, f_out = self.model(images)
 
