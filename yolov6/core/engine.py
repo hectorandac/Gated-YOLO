@@ -158,13 +158,9 @@ class Trainer:
 
     # Training loop for each epoch
     def train_one_epoch(self, epoch_num):
-        print_detail = True
         try:
             for self.step, self.batch_data in self.pbar:
-                self.last_g_percentage, desired_target = self.train_in_steps(epoch_num, self.step)
-                if print_detail:
-                    print(f"Closed percentage (g_beta): {self.last_g_percentage:.2f}% | Target: {((1 - desired_target) * 100):.2f}%")
-                    print_detail = False
+                self.train_in_steps(epoch_num, self.step)
                 self.print_details()
         except Exception as _:
             LOGGER.error('ERROR in training steps.')
@@ -214,8 +210,8 @@ class Trainer:
         # backward
         self.scaler.scale(total_loss).backward()
         self.loss_items = loss_items
+        self.last_g_percentage = closed_gates_percentage
         self.update_optimizer()
-        return closed_gates_percentage, target_loss
 
     def after_epoch(self):
         lrs_of_this_epoch = [x['lr'] for x in self.optimizer.param_groups]

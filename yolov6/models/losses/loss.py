@@ -201,6 +201,7 @@ class ComputeLoss:
         # Compute gating loss (L1 regularization term)
         # Compute the gating loss
         gating_loss = None
+        target_loss = None
         if gating_decision is not None:
             g_reconstructed = torch.cat([gd[0].flatten(start_dim=1) for gd in gating_decision], dim=1)
 

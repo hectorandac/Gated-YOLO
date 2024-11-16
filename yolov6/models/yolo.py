@@ -38,62 +38,55 @@ class Model(nn.Module):
         # Init weights
         initialize_weights(self)
 
-    def forward_bb(self, x):
-        export_mode = torch.onnx.is_in_onnx_export() or self.export
-        closed_gates_percentage = 0
-
-        gating_decisions_a = None
-        gating_decisions_b = None
-        gating_decisions_c = None
-
-        f_out = None
-
-        if not export_mode:
-            featmaps = []
-            featmaps.extend(x)
-        if self.training:
-            x = self.detect(x, gating_decisions_c)
-            #gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
-            #closed_gates_percentage = (closed_gates_percentage_a + closed_gates_percentage_b + closed_gates_percentage_c) / 3
-            return x, featmaps, closed_gates_percentage, f_out
-        else:
-            x = self.detect(x, gating_decisions_c)
-            #gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
-            return x
-
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
-        closed_gates_percentage = 0
+        if self.enable_gater_net:
+            closed_gates_percentage = 0
 
-        gating_decisions_a = None
-        gating_decisions_b = None
-        gating_decisions_c = None
+            gating_decisions_a = None
+            gating_decisions_b = None
+            gating_decisions_c = None
 
-        f_out = None
-        
-        if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_a, closed_gates_percentage_a, f_out = self.gater_b(x, training=self.training, epsilon=1.0 if self.training else 0)
-        x = self.backbone(x, gating_decisions_a)
+            f_out = None
+            
+            if not self.fixed_gates_enable:
+                gating_decisions_a, closed_gates_percentage_a, f_out = self.gater_b(x, training=self.training, epsilon=1.0 if self.training else 0)
+            x = self.backbone(x, gating_decisions_a)
 
-        if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_b, closed_gates_percentage_b, _f_out = self.gater_n(x, training=self.training, epsilon=1.0 if self.training else 0)
-        x = self.neck(x, gating_decisions_b)
+            if not self.fixed_gates_enable:
+                gating_decisions_b, closed_gates_percentage_b, _f_out = self.gater_n(x, training=self.training, epsilon=1.0 if self.training else 0)
+            x = self.neck(x, gating_decisions_b)
 
-        if self.enable_gater_net and not self.fixed_gates_enable:
-            gating_decisions_c, closed_gates_percentage_c, _f_out = self.gater_h(x, training=self.training, epsilon=1.0 if self.training else 0)
+            if not self.fixed_gates_enable:
+                gating_decisions_c, closed_gates_percentage_c, _f_out = self.gater_h(x, training=self.training, epsilon=1.0 if self.training else 0)
 
-        if not export_mode:
-            featmaps = []
-            featmaps.extend(x)
-        if self.training:
-            x = self.detect(x, gating_decisions_c)
-            gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
-            closed_gates_percentage = (closed_gates_percentage_a + closed_gates_percentage_b + closed_gates_percentage_c) / 3
-            return x, gating_decisions, featmaps, closed_gates_percentage, f_out
+            if not export_mode:
+                featmaps = []
+                featmaps.extend(x)
+            if self.training:
+                x = self.detect(x, gating_decisions_c)
+                gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
+                closed_gates_percentage = (closed_gates_percentage_a + closed_gates_percentage_b + closed_gates_percentage_c) / 3
+                return x, gating_decisions, featmaps, closed_gates_percentage, f_out
+            else:
+                x = self.detect(x, gating_decisions_c)
+                gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
+                return x, gating_decisions, None
         else:
-            x = self.detect(x, gating_decisions_c)
-            gating_decisions = [*gating_decisions_a, *gating_decisions_b, *gating_decisions_c]
-            return x, gating_decisions, None
+            gating_decisions = None
+            
+            x = self.backbone(x, gating_decisions)
+            x = self.neck(x, gating_decisions)
+            if not export_mode:
+                featmaps = []
+                featmaps.extend(x)
+            if self.training:
+                x = self.detect(x, gating_decisions)
+                return x, gating_decisions, featmaps, None, None
+            else:
+                x = self.detect(x, gating_decisions)
+                return x, gating_decisions, None
+
 
     def _apply(self, fn):
         self = super()._apply(fn)
